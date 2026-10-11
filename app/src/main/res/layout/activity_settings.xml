@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F1F5F9"
+    android:orientation="vertical">
+
+    <!-- Header -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:background="#E11D48"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_centerVertical="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="חזור"
+            android:src="@drawable/ic_back" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_marginStart="12dp"
+            android:layout_toEndOf="@id/btnBack"
+            android:text="@string/settings_title"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnChangePass"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:background="@drawable/bg_chip_inactive"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="@string/btn_change_pass"
+            android:textColor="#1E293B"
+            android:textSize="12sp" />
+    </RelativeLayout>
+
+    <!-- Search Box and Add Custom Channel -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <EditText
+            android:id="@+id/etSearchChannels"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_input"
+            android:hint="@string/search_channels_hint"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:textColor="#1E293B"
+            android:textColorHint="#94A3B8"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btnAddCustomChannel"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_button"
+            android:text="@string/btn_add_custom"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Categories Filter -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/llCategoryChips"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingBottom="8dp" />
+    </HorizontalScrollView>
+
+    <!-- Channel List -->
+    <ListView
+        android:id="@+id/lvSettingsChannels"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="6dp"
+        android:padding="12dp" />
+
+</LinearLayout>

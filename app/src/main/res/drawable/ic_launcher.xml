@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Background Card with rounded corners -->
+    <path
+        android:fillColor="#E11D48"
+        android:pathData="M16,12 L80,12 A12,12 0 0,1 92,24 L92,72 A12,12 0 0,1 80,84 L16,84 A12,12 0 0,1 4,72 L4,24 A12,12 0 0,1 16,12 Z" />
+
+    <!-- Shield icon background representing security -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,24 L68,30 L68,48 C68,60 59,70 48,74 C37,70 28,60 28,48 L28,30 Z" />
+
+    <!-- Play icon triangle inside shield -->
+    <path
+        android:fillColor="#E11D48"
+        android:pathData="M43,38 L58,48 L43,58 Z" />
+
+</vector>
