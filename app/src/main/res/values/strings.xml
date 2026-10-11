@@ -30,6 +30,8 @@
     <string name="category_general">כללי ותוכן מומלץ</string>
     <string name="category_custom">ערוץ מותאם</string>
     <string name="add_channel_title">חיפוש ערוצים ביוטיוב</string>
+    <string name="channel_id_hint">מזהה ערוץ (Channel ID)</string>
+    <string name="channel_name_hint">שם הערוץ</string>
     <string name="search_channel_input_hint">הקלד שם ערוץ (למשל: כאן 11, בריינפופ...)</string>
     <string name="searching_channels">מחפש ערוצים ביוטיוב...</string>
     <string name="no_channel_results">לא נמצאו ערוצים מתאימים. נסה שם אחר.</string>
