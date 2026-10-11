@@ -5,17 +5,31 @@
     android:background="@drawable/bg_card"
     android:padding="12dp">
 
+    <ImageView
+        android:id="@+id/ivChannelAvatar"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true"
+        android:layout_marginEnd="12dp"
+        android:contentDescription="לוגו ערוץ"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ic_channel_default" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_centerVertical="true"
-        android:layout_toStartOf="@id/switchApproved"
+        android:layout_toEndOf="@id/ivChannelAvatar"
+        android:layout_toStartOf="@id/llChannelControls"
         android:orientation="vertical">
 
         <TextView
             android:id="@+id/tvChannelName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
             android:textColor="#1E293B"
             android:textSize="15sp"
             android:textStyle="bold" />
@@ -33,15 +47,35 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
+            android:ellipsize="middle"
+            android:maxLines="1"
             android:textColor="#94A3B8"
             android:textSize="10sp" />
     </LinearLayout>
 
-    <Switch
-        android:id="@+id/switchApproved"
+    <LinearLayout
+        android:id="@+id/llChannelControls"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
-        android:layout_centerVertical="true" />
+        android:layout_centerVertical="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <Switch
+            android:id="@+id/switchApproved"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <ImageButton
+            android:id="@+id/btnDeleteChannel"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_delete_btn"
+            android:contentDescription="@string/btn_delete"
+            android:padding="7dp"
+            android:src="@drawable/ic_delete" />
+    </LinearLayout>
 
 </RelativeLayout>

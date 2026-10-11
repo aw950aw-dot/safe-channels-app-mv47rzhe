@@ -2,17 +2,22 @@ package com.generated.app;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -56,10 +61,15 @@ public class SettingsActivity extends Activity {
         llCategoryChips = findViewById(R.id.llCategoryChips);
         lvSettingsChannels = findViewById(R.id.lvSettingsChannels);
 
-        channelAdapter = new ChannelAdapter(this, filteredChannels, new ChannelAdapter.OnChannelToggleListener() {
+        channelAdapter = new ChannelAdapter(this, filteredChannels, new ChannelAdapter.OnChannelActionListener() {
             @Override
             public void onToggle(ChannelModel channel, boolean isApproved) {
                 dataManager.setChannelApproved(channel.getId(), isApproved);
+            }
+
+            @Override
+            public void onDelete(ChannelModel channel) {
+                confirmDeleteChannel(channel);
             }
         });
         lvSettingsChannels.setAdapter(channelAdapter);
@@ -83,7 +93,7 @@ public class SettingsActivity extends Activity {
         btnAddCustomChannel.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showAddChannelDialog();
+                showSearchAddChannelDialog();
             }
         });
 
@@ -115,6 +125,7 @@ public class SettingsActivity extends Activity {
         addCategoryChip(getString(R.string.category_science), "מדע וטכנולוגיה", selectedCategory.equals("מדע וטכנולוגיה"));
         addCategoryChip(getString(R.string.category_education), "חינוך וידע", selectedCategory.equals("חינוך וידע"));
         addCategoryChip(getString(R.string.category_general), "כללי ותוכן מומלץ", selectedCategory.equals("כללי ותוכן מומלץ"));
+        addCategoryChip(getString(R.string.category_custom), "ערוץ מותאם", selectedCategory.equals("ערוץ מותאם"));
     }
 
     private void addCategoryChip(final String label, final String catKey, boolean isSelected) {
@@ -168,74 +179,207 @@ public class SettingsActivity extends Activity {
         channelAdapter.updateData(filteredChannels);
     }
 
-    private void showAddChannelDialog() {
+    private void confirmDeleteChannel(final ChannelModel channel) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        View view = LayoutInflater.from(this).inflate(R.layout.dialog_add_channel, null);
-        final EditText etId = view.findViewById(R.id.etAddChannelId);
-        final EditText etName = view.findViewById(R.id.etAddChannelName);
-
-        builder.setView(view)
-                .setPositiveButton(R.string.btn_add_channel, new DialogInterface.OnClickListener() {
+        builder.setTitle(R.string.delete_channel_title)
+                .setMessage(String.format(getString(R.string.delete_channel_confirm), channel.getName()))
+                .setPositiveButton(R.string.btn_delete, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        String rawInput = etId.getText().toString().trim();
-                        String channelName = etName.getText().toString().trim();
-
-                        String channelId = extractChannelId(rawInput);
-                        if (channelId.isEmpty()) {
-                            Toast.makeText(SettingsActivity.this, R.string.invalid_channel_id, Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-
-                        if (channelName.isEmpty()) {
-                            channelName = "ערוץ " + channelId.substring(0, Math.min(6, channelId.length()));
-                        }
-
-                        dataManager.addCustomChannel(channelId, channelName);
-                        Toast.makeText(SettingsActivity.this, R.string.channel_added, Toast.LENGTH_SHORT).show();
+                        dataManager.deleteChannel(channel.getId());
+                        Toast.makeText(SettingsActivity.this, R.string.channel_deleted, Toast.LENGTH_SHORT).show();
                         loadChannelsData();
                     }
                 })
                 .setNegativeButton(R.string.btn_cancel, null)
-                .create()
                 .show();
     }
 
-    private String extractChannelId(String input) {
-        if (input == null || input.isEmpty()) return "";
-        if (input.startsWith("UC") && input.length() >= 20) {
-            return input;
-        }
-        if (input.contains("channel/")) {
-            String[] parts = input.split("channel/");
-            if (parts.length > 1) {
-                String idPart = parts[1];
-                if (idPart.contains("?")) idPart = idPart.split("\\?")[0];
-                if (idPart.contains("/")) idPart = idPart.split("/")[0];
-                return idPart;
+    private void showSearchAddChannelDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_search_channel, null);
+
+        final EditText etQuery = dialogView.findViewById(R.id.etSearchChannelQuery);
+        final Button btnSearch = dialogView.findViewById(R.id.btnDoSearch);
+        final ListView lvResults = dialogView.findViewById(R.id.lvSearchResults);
+        final ProgressBar pbLoading = dialogView.findViewById(R.id.pbSearchLoading);
+        final TextView tvStatus = dialogView.findViewById(R.id.tvSearchStatus);
+
+        final List<ChannelSearchHelper.ChannelSearchResult> searchResults = new ArrayList<>();
+        final SearchResultsAdapter adapter = new SearchResultsAdapter(this, searchResults);
+        lvResults.setAdapter(adapter);
+
+        builder.setView(dialogView)
+                .setNegativeButton(R.string.btn_cancel, null);
+
+        final AlertDialog dialog = builder.create();
+
+        adapter.setOnAddClickListener(new SearchResultsAdapter.OnAddClickListener() {
+            @Override
+            public void onAdd(ChannelSearchHelper.ChannelSearchResult item) {
+                if (dataManager.channelExists(item.getId())) {
+                    Toast.makeText(SettingsActivity.this, R.string.channel_already_exists, Toast.LENGTH_SHORT).show();
+                } else {
+                    dataManager.addCustomChannel(item.getId(), item.getName(), item.getAvatarUrl());
+                    Toast.makeText(SettingsActivity.this, R.string.channel_added, Toast.LENGTH_SHORT).show();
+                    loadChannelsData();
+                    dialog.dismiss();
+                }
             }
-        }
-        return input;
+        });
+
+        btnSearch.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String query = etQuery.getText().toString().trim();
+                if (query.isEmpty()) {
+                    Toast.makeText(SettingsActivity.this, "נא להקליד שם ערוץ", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                pbLoading.setVisibility(View.VISIBLE);
+                tvStatus.setVisibility(View.GONE);
+                searchResults.clear();
+                adapter.notifyDataSetChanged();
+
+                ChannelSearchHelper.searchChannels(query, new ChannelSearchHelper.SearchCallback() {
+                    @Override
+                    public void onSuccess(List<ChannelSearchHelper.ChannelSearchResult> results) {
+                        pbLoading.setVisibility(View.GONE);
+                        if (results.isEmpty()) {
+                            tvStatus.setText(R.string.no_channel_results);
+                            tvStatus.setVisibility(View.VISIBLE);
+                        } else {
+                            searchResults.addAll(results);
+                            adapter.notifyDataSetChanged();
+                            tvStatus.setVisibility(View.GONE);
+                        }
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        pbLoading.setVisibility(View.GONE);
+                        tvStatus.setText(message);
+                        tvStatus.setVisibility(View.VISIBLE);
+                    }
+                });
+            }
+        });
+
+        dialog.show();
     }
 
     private void showChangePasswordDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_change_password, null);
-        final EditText etNewPassword = view.findViewById(R.id.etNewPassword);
+
+        final EditText etCurrent = view.findViewById(R.id.etCurrentPassword);
+        final EditText etNew = view.findViewById(R.id.etNewPassword);
+        final EditText etConfirm = view.findViewById(R.id.etConfirmPassword);
 
         builder.setView(view)
                 .setPositiveButton(R.string.btn_confirm, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        String newPass = etNewPassword.getText().toString().trim();
-                        if (!newPass.isEmpty()) {
-                            dataManager.setPassword(newPass);
-                            Toast.makeText(SettingsActivity.this, R.string.password_updated, Toast.LENGTH_SHORT).show();
+                        String currentPass = etCurrent.getText().toString().trim();
+                        String newPass = etNew.getText().toString().trim();
+                        String confirmPass = etConfirm.getText().toString().trim();
+
+                        if (!dataManager.checkPassword(currentPass)) {
+                            Toast.makeText(SettingsActivity.this, R.string.incorrect_password, Toast.LENGTH_SHORT).show();
+                            return;
                         }
+
+                        if (newPass.isEmpty()) {
+                            Toast.makeText(SettingsActivity.this, R.string.password_empty, Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        if (!newPass.equals(confirmPass)) {
+                            Toast.makeText(SettingsActivity.this, R.string.passwords_dont_match, Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        dataManager.setPassword(newPass);
+                        Toast.makeText(SettingsActivity.this, R.string.password_updated, Toast.LENGTH_SHORT).show();
                     }
                 })
                 .setNegativeButton(R.string.btn_cancel, null)
                 .create()
                 .show();
+    }
+
+    private static class SearchResultsAdapter extends BaseAdapter {
+        public interface OnAddClickListener {
+            void onAdd(ChannelSearchHelper.ChannelSearchResult item);
+        }
+
+        private Context context;
+        private List<ChannelSearchHelper.ChannelSearchResult> list;
+        private LayoutInflater inflater;
+        private OnAddClickListener onAddClickListener;
+
+        public SearchResultsAdapter(Context context, List<ChannelSearchHelper.ChannelSearchResult> list) {
+            this.context = context;
+            this.list = list;
+            this.inflater = LayoutInflater.from(context);
+        }
+
+        public void setOnAddClickListener(OnAddClickListener listener) {
+            this.onAddClickListener = listener;
+        }
+
+        @Override
+        public int getCount() { return list != null ? list.size() : 0; }
+
+        @Override
+        public Object getItem(int position) { return list.get(position); }
+
+        @Override
+        public long getItemId(int position) { return position; }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            ViewHolder holder;
+            if (convertView == null) {
+                convertView = inflater.inflate(R.layout.item_search_channel, parent, false);
+                holder = new ViewHolder();
+                holder.ivAvatar = convertView.findViewById(R.id.ivSearchChannelAvatar);
+                holder.tvName = convertView.findViewById(R.id.tvSearchChannelName);
+                holder.tvDesc = convertView.findViewById(R.id.tvSearchChannelDesc);
+                holder.btnAdd = convertView.findViewById(R.id.btnAddThisChannel);
+                convertView.setTag(holder);
+            } else {
+                holder = (ViewHolder) convertView.getTag();
+            }
+
+            final ChannelSearchHelper.ChannelSearchResult item = list.get(position);
+            holder.tvName.setText(item.getName());
+            holder.tvDesc.setText(!item.getDescription().isEmpty() ? item.getDescription() : ("ID: " + item.getId()));
+
+            if (item.getAvatarUrl() != null && !item.getAvatarUrl().isEmpty()) {
+                ImageLoader.getInstance().displayImage(item.getAvatarUrl(), holder.ivAvatar);
+            } else {
+                holder.ivAvatar.setImageResource(R.drawable.ic_channel_default);
+            }
+
+            holder.btnAdd.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (onAddClickListener != null) {
+                        onAddClickListener.onAdd(item);
+                    }
+                }
+            });
+
+            return convertView;
+        }
+
+        private static class ViewHolder {
+            ImageView ivAvatar;
+            TextView tvName;
+            TextView tvDesc;
+            Button btnAdd;
+        }
     }
 }

@@ -6,6 +6,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.CompoundButton;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.Switch;
 import android.widget.TextView;
 
@@ -16,16 +18,17 @@ public class ChannelAdapter extends BaseAdapter {
     private Context context;
     private List<ChannelModel> channels;
     private LayoutInflater inflater;
-    private OnChannelToggleListener toggleListener;
+    private OnChannelActionListener actionListener;
 
-    public interface OnChannelToggleListener {
+    public interface OnChannelActionListener {
         void onToggle(ChannelModel channel, boolean isApproved);
+        void onDelete(ChannelModel channel);
     }
 
-    public ChannelAdapter(Context context, List<ChannelModel> channels, OnChannelToggleListener listener) {
+    public ChannelAdapter(Context context, List<ChannelModel> channels, OnChannelActionListener listener) {
         this.context = context;
         this.channels = channels;
-        this.toggleListener = listener;
+        this.actionListener = listener;
         this.inflater = LayoutInflater.from(context);
     }
 
@@ -55,10 +58,12 @@ public class ChannelAdapter extends BaseAdapter {
         if (convertView == null) {
             convertView = inflater.inflate(R.layout.item_channel, parent, false);
             holder = new ViewHolder();
+            holder.ivAvatar = convertView.findViewById(R.id.ivChannelAvatar);
             holder.tvName = convertView.findViewById(R.id.tvChannelName);
             holder.tvCategory = convertView.findViewById(R.id.tvChannelCategory);
             holder.tvId = convertView.findViewById(R.id.tvChannelId);
             holder.switchApproved = convertView.findViewById(R.id.switchApproved);
+            holder.btnDelete = convertView.findViewById(R.id.btnDeleteChannel);
             convertView.setTag(holder);
         } else {
             holder = (ViewHolder) convertView.getTag();
@@ -69,6 +74,12 @@ public class ChannelAdapter extends BaseAdapter {
         holder.tvCategory.setText(channel.getCategory());
         holder.tvId.setText("ID: " + channel.getId());
 
+        if (channel.getAvatarUrl() != null && !channel.getAvatarUrl().isEmpty()) {
+            ImageLoader.getInstance().displayImage(channel.getAvatarUrl(), holder.ivAvatar);
+        } else {
+            holder.ivAvatar.setImageResource(R.drawable.ic_channel_default);
+        }
+
         holder.switchApproved.setOnCheckedChangeListener(null);
         holder.switchApproved.setChecked(channel.isApproved());
 
@@ -76,8 +87,17 @@ public class ChannelAdapter extends BaseAdapter {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 channel.setApproved(isChecked);
-                if (toggleListener != null) {
-                    toggleListener.onToggle(channel, isChecked);
+                if (actionListener != null) {
+                    actionListener.onToggle(channel, isChecked);
+                }
+            }
+        });
+
+        holder.btnDelete.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (actionListener != null) {
+                    actionListener.onDelete(channel);
                 }
             }
         });
@@ -86,9 +106,11 @@ public class ChannelAdapter extends BaseAdapter {
     }
 
     private static class ViewHolder {
+        ImageView ivAvatar;
         TextView tvName;
         TextView tvCategory;
         TextView tvId;
         Switch switchApproved;
+        ImageButton btnDelete;
     }
 }
