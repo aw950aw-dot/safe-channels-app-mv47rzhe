@@ -230,23 +230,19 @@ public class PlayerActivity extends Activity {
         final String[] qualities = new String[]{
                 getString(R.string.video_quality_1080),
                 getString(R.string.video_quality_720),
-                getString(R.string.video_quality_360),
-                getString(R.string.download_fallback_option)
+                getString(R.string.video_quality_360)
         };
-        final String[] qualityValues = new String[]{"1080p", "720p", "360p", "WEB"};
+        final String[] qualityValues = new String[]{"1080p", "720p", "360p"};
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.select_download_quality)
                 .setItems(qualities, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        if ("WEB".equals(qualityValues[which])) {
-                            openWebDownloader(false);
-                        } else {
-                            startDirectInAppDownload(qualityValues[which], false);
-                        }
+                        startDirectInAppDownload(qualityValues[which], false);
                     }
                 })
+                .setNegativeButton(R.string.btn_cancel, null)
                 .show();
     }
 
@@ -254,29 +250,25 @@ public class PlayerActivity extends Activity {
         final String[] audioQualities = new String[]{
                 getString(R.string.audio_quality_high),
                 getString(R.string.audio_quality_med),
-                getString(R.string.audio_quality_low),
-                getString(R.string.download_fallback_option)
+                getString(R.string.audio_quality_low)
         };
-        final String[] audioQualityValues = new String[]{"160k", "128k", "64k", "WEB"};
+        final String[] audioQualityValues = new String[]{"160k", "128k", "64k"};
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.select_audio_quality)
                 .setItems(audioQualities, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        if ("WEB".equals(audioQualityValues[which])) {
-                            openWebDownloader(true);
-                        } else {
-                            startDirectInAppDownload(audioQualityValues[which], true);
-                        }
+                        startDirectInAppDownload(audioQualityValues[which], true);
                     }
                 })
+                .setNegativeButton(R.string.btn_cancel, null)
                 .show();
     }
 
     private void startDirectInAppDownload(final String qualityKey, final boolean isAudioOnly) {
         pbDownloadLoading.setVisibility(View.VISIBLE);
-        Toast.makeText(this, isAudioOnly ? "מחלץ קישור להורדת שיר..." : "מחלץ קישור להורדת סרטון...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, isAudioOnly ? "מחלץ שמע ישירות משרתי NewPipe..." : "מחלץ וידאו ישירות משרתי NewPipe...", Toast.LENGTH_SHORT).show();
 
         DownloadHelper.getStreamUrl(currentVideoId, qualityKey, isAudioOnly, new DownloadHelper.StreamCallback() {
             @Override
@@ -292,55 +284,25 @@ public class PlayerActivity extends Activity {
             }
 
             @Override
-            public void onError(String error) {
+            public void onError(final String error) {
                 pbDownloadLoading.setVisibility(View.GONE);
-                showDownloadFallbackDialog(isAudioOnly);
+                showDownloadRetryDialog(qualityKey, isAudioOnly, error);
             }
         });
     }
 
-    private void showDownloadFallbackDialog(final boolean isAudioOnly) {
+    private void showDownloadRetryDialog(final String qualityKey, final boolean isAudioOnly, String errorMessage) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.download_failed_title)
                 .setMessage(R.string.download_failed_message)
-                .setPositiveButton(R.string.btn_open_web_downloader, new DialogInterface.OnClickListener() {
+                .setPositiveButton(R.string.btn_retry, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        openWebDownloader(isAudioOnly);
+                        startDirectInAppDownload(qualityKey, isAudioOnly);
                     }
                 })
-                .setNeutralButton(R.string.btn_open_cobalt, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        openCobaltDownloader();
-                    }
-                })
-                .setNegativeButton(R.string.btn_cancel, null)
+                .setNegativeButton(R.string.btn_close, null)
                 .show();
-    }
-
-    private void openWebDownloader(boolean isAudioOnly) {
-        try {
-            String targetWebUrl;
-            if (isAudioOnly) {
-                targetWebUrl = "https://www.y2mate.com/youtube-mp3/" + currentVideoId;
-            } else {
-                targetWebUrl = "https://www.y2mate.com/youtube/" + currentVideoId;
-            }
-            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(targetWebUrl));
-            startActivity(browserIntent);
-            Toast.makeText(this, "נפתח מקור הורדה ישיר בדפדפן", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Toast.makeText(this, "לא ניתן לפתוח דפדפן במכשיר", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void openCobaltDownloader() {
-        try {
-            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://cobalt.tools"));
-            startActivity(browserIntent);
-            Toast.makeText(this, "נפתח אתר ההורדה Cobalt", Toast.LENGTH_SHORT).show();
-        } catch (Exception ignored) {}
     }
 
     private void startBackgroundPlayback() {
