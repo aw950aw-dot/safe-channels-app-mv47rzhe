@@ -333,7 +333,6 @@ public class PlayerActivity extends Activity {
         pbDownloadLoading.setVisibility(View.VISIBLE);
         Toast.makeText(this, R.string.bg_audio_loading, Toast.LENGTH_SHORT).show();
 
-        // Pause webview video so they don't play simultaneously
         if (webViewPlayer != null) {
             webViewPlayer.loadUrl("javascript:(function(){var v=document.querySelector('video');if(v){v.pause();}})()");
         }

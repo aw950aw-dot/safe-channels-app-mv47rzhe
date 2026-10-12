@@ -4,37 +4,37 @@
     android:viewportWidth="96"
     android:viewportHeight="96">
 
-    <!-- Premium Rounded Square Background in Crimson Palette -->
+    <!-- Premium Crimson Card Shape -->
     <path
         android:fillColor="#9F1239"
         android:pathData="M20,6 L76,6 A14,14 0 0,1 90,20 L90,76 A14,14 0 0,1 76,90 L20,90 A14,14 0 0,1 6,76 L6,20 A14,14 0 0,1 20,6 Z" />
 
-    <!-- Upper Crimson Gradient Accent -->
+    <!-- Vibrant Top Accent Banner -->
     <path
         android:fillColor="#E11D48"
         android:pathData="M20,6 L76,6 A14,14 0 0,1 90,20 L90,50 L6,50 L6,20 A14,14 0 0,1 20,6 Z" />
 
-    <!-- Protective Shield Body in Pure White -->
+    <!-- Protective Shield Icon Frame -->
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M48,16 L74,26 L74,50 C74,65.8 62.8,78 48,82 C33.2,78 22,65.8 22,50 L22,26 Z" />
 
-    <!-- Inner Soft Accent Shield -->
+    <!-- Inner Soft Rose Accent Shield -->
     <path
         android:fillColor="#FFE4E6"
         android:pathData="M48,21 L70,29.5 L70,49 C70,62.2 60.5,72.4 48,76 C35.5,72.4 26,62.2 26,49 L26,29.5 Z" />
 
-    <!-- Play Triangle Glyph in Rose Red -->
+    <!-- Central Play Triangle Symbol -->
     <path
         android:fillColor="#E11D48"
         android:pathData="M41,34 L62,48.5 L41,63 Z" />
 
-    <!-- Download Accent Indicator Symbol -->
+    <!-- Download Arrow Indicator -->
     <path
         android:fillColor="#BE123C"
         android:pathData="M45,41 L51,41 L51,48 L56,48 L48,56 L40,48 L45,48 Z" />
 
-    <!-- Top Corner Safe Verified Checkmark -->
+    <!-- Verified Emerald Badge -->
     <path
         android:fillColor="#10B981"
         android:pathData="M67,15 A8.5,8.5 0 1,1 84,15 A8.5,8.5 0 1,1 67,15 Z" />
