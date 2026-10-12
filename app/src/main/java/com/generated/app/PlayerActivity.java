@@ -4,9 +4,13 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -27,14 +31,15 @@ public class PlayerActivity extends Activity {
 
     private Button btnDownloadVideo;
     private Button btnDownloadAudio;
-    private Button btnWatchQuality;
+    private Button btnDirectStream;
     private Button btnSwitchServer;
+    private ImageButton btnExternalOpen;
     private ProgressBar pbDownloadLoading;
+    private ProgressBar pbPlayerLoading;
 
     private String currentVideoId = "";
     private String currentVideoTitle = "";
-    private String selectedWatchQuality = "720p";
-    private boolean useInvidiousFallback = false;
+    private int playerMode = 0; // 0 = YouTube Embed, 1 = Invidious Embed, 2 = HTML5 Direct Stream
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,6 +47,7 @@ public class PlayerActivity extends Activity {
         setContentView(R.layout.activity_player);
 
         initViews();
+        setupWebView();
 
         Intent intent = getIntent();
         if (intent != null) {
@@ -53,11 +59,11 @@ public class PlayerActivity extends Activity {
 
             tvPlayerTitle.setText(currentVideoTitle != null ? currentVideoTitle : "");
             tvPlayerChannel.setText(channel != null ? channel : "");
-            tvPlayerDate.setText(date != null ? "פורסם ב: " + date : "");
+            tvPlayerDate.setText(date != null && !date.isEmpty() ? "פורסם ב: " + date : "");
             tvPlayerDescription.setText(description != null && !description.isEmpty() ? description : "אין תיאור זמין עבור סרטון זה.");
 
             if (currentVideoId != null && !currentVideoId.isEmpty()) {
-                loadPlayer(currentVideoId);
+                loadPlayerCurrentMode();
             }
         }
 
@@ -74,9 +80,50 @@ public class PlayerActivity extends Activity {
 
         btnDownloadVideo = findViewById(R.id.btnDownloadVideo);
         btnDownloadAudio = findViewById(R.id.btnDownloadAudio);
-        btnWatchQuality = findViewById(R.id.btnWatchQuality);
+        btnDirectStream = findViewById(R.id.btnDirectStream);
         btnSwitchServer = findViewById(R.id.btnSwitchServer);
+        btnExternalOpen = findViewById(R.id.btnExternalOpen);
         pbDownloadLoading = findViewById(R.id.pbDownloadLoading);
+        pbPlayerLoading = findViewById(R.id.pbPlayerLoading);
+    }
+
+    private void setupWebView() {
+        WebSettings ws = webViewPlayer.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setDatabaseEnabled(true);
+        ws.setAllowFileAccess(true);
+        ws.setAllowContentAccess(true);
+        ws.setMediaPlaybackRequiresUserGesture(false);
+        ws.setUseWideViewPort(true);
+        ws.setLoadWithOverviewMode(true);
+        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36");
+
+        webViewPlayer.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onProgressChanged(WebView view, int newProgress) {
+                if (newProgress >= 90) {
+                    pbPlayerLoading.setVisibility(View.GONE);
+                }
+            }
+        });
+
+        webViewPlayer.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                pbPlayerLoading.setVisibility(View.VISIBLE);
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                pbPlayerLoading.setVisibility(View.GONE);
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                // If standard fails, offer or switch fallback
+            }
+        });
     }
 
     private void setupListeners() {
@@ -87,21 +134,28 @@ public class PlayerActivity extends Activity {
             }
         });
 
-        btnWatchQuality.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showWatchQualityDialog();
-            }
-        });
-
         btnSwitchServer.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                useInvidiousFallback = !useInvidiousFallback;
-                Toast.makeText(PlayerActivity.this, useInvidiousFallback ? "עובר לשרת נגן חלופי" : "עובר לנגן יוטיוב רגיל", Toast.LENGTH_SHORT).show();
-                if (currentVideoId != null && !currentVideoId.isEmpty()) {
-                    loadPlayer(currentVideoId);
-                }
+                // Toggle mode between 0 (YouTube) and 1 (Invidious)
+                playerMode = (playerMode == 0) ? 1 : 0;
+                String modeName = playerMode == 1 ? "שרת פרטי (Invidious)" : "נגן יוטיוב רשמי";
+                Toast.makeText(PlayerActivity.this, "הוחלף ל: " + modeName, Toast.LENGTH_SHORT).show();
+                loadPlayerCurrentMode();
+            }
+        });
+
+        btnDirectStream.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                loadDirectHtml5Stream();
+            }
+        });
+
+        btnExternalOpen.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openInExternalApp();
             }
         });
 
@@ -120,54 +174,84 @@ public class PlayerActivity extends Activity {
         });
     }
 
-    private void loadPlayer(String videoId) {
-        WebSettings webSettings = webViewPlayer.getSettings();
-        webSettings.setJavaScriptEnabled(true);
-        webSettings.setDomStorageEnabled(true);
-        webSettings.setDatabaseEnabled(true);
-        webSettings.setMediaPlaybackRequiresUserGesture(false);
-        webSettings.setAllowFileAccess(true);
-        webSettings.setUserAgentString("Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+    private void loadPlayerCurrentMode() {
+        pbPlayerLoading.setVisibility(View.VISIBLE);
 
-        webViewPlayer.setWebChromeClient(new WebChromeClient());
-        webViewPlayer.setWebViewClient(new WebViewClient());
+        if (playerMode == 0) {
+            // Mode 0: Clean YouTube Embed with HTML5 container
+            String embedUrl = "https://www.youtube-nocookie.com/embed/" + currentVideoId +
+                    "?autoplay=1&playsinline=1&enablejsapi=1&rel=0&modestbranding=1&fs=1";
 
-        String embedUrl;
-        if (useInvidiousFallback) {
-            embedUrl = "https://inv.nadeko.net/embed/" + videoId + "?autoplay=1&quality=" + selectedWatchQuality;
-        } else {
-            embedUrl = "https://www.youtube-nocookie.com/embed/" + videoId + "?autoplay=1&rel=0&modestbranding=1&enablejsapi=1&origin=https://www.youtube.com";
+            String html = "<!DOCTYPE html><html><head>" +
+                    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">" +
+                    "<style>" +
+                    "* { margin:0; padding:0; box-sizing:border-box; background:#000; }" +
+                    "html, body { width:100%; height:100%; overflow:hidden; background-color:#000000; }" +
+                    "iframe { width:100%; height:100%; border:none; display:block; }" +
+                    "</style></head><body>" +
+                    "<iframe src=\"" + embedUrl + "\" " +
+                    "allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" " +
+                    "allowfullscreen></iframe>" +
+                    "</body></html>";
+
+            webViewPlayer.loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "UTF-8", null);
+
+        } else if (playerMode == 1) {
+            // Mode 1: Invidious Embed
+            String embedUrl = "https://inv.nadeko.net/embed/" + currentVideoId + "?autoplay=1";
+            String html = "<!DOCTYPE html><html><head>" +
+                    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">" +
+                    "<style>" +
+                    "* { margin:0; padding:0; box-sizing:border-box; background:#000; }" +
+                    "html, body { width:100%; height:100%; overflow:hidden; background-color:#000000; }" +
+                    "iframe { width:100%; height:100%; border:none; display:block; }" +
+                    "</style></head><body>" +
+                    "<iframe src=\"" + embedUrl + "\" allowfullscreen></iframe>" +
+                    "</body></html>";
+
+            webViewPlayer.loadDataWithBaseURL("https://inv.nadeko.net", html, "text/html", "UTF-8", null);
         }
-
-        String embedHtml = "<!DOCTYPE html><html><head>" +
-                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">" +
-                "<style>body, html { margin:0; padding:0; width:100%; height:100%; background-color:#000000; overflow:hidden; }" +
-                "iframe { width:100%; height:100%; border:none; }</style></head><body>" +
-                "<iframe id=\"player\" src=\"" + embedUrl + "\" " +
-                "allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" allowfullscreen></iframe>" +
-                "</body></html>";
-
-        webViewPlayer.loadDataWithBaseURL("https://www.youtube.com", embedHtml, "text/html", "UTF-8", null);
     }
 
-    private void showWatchQualityDialog() {
-        final String[] qualities = new String[]{"1080p", "720p", "480p", "360p", "240p", "אוטימטי (Auto)"};
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.select_watch_quality)
-                .setItems(qualities, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        selectedWatchQuality = qualities[which].contains("1080") ? "1080p" :
-                                qualities[which].contains("720") ? "720p" :
-                                qualities[which].contains("480") ? "480p" :
-                                qualities[which].contains("360") ? "360p" : "auto";
-                        Toast.makeText(PlayerActivity.this, "איכות הצפייה הוגדרה ל: " + qualities[which], Toast.LENGTH_SHORT).show();
-                        if (currentVideoId != null && !currentVideoId.isEmpty()) {
-                            loadPlayer(currentVideoId);
-                        }
-                    }
-                })
-                .show();
+    private void loadDirectHtml5Stream() {
+        pbPlayerLoading.setVisibility(View.VISIBLE);
+        Toast.makeText(this, "מחלץ קישור הזרמה ישיר...", Toast.LENGTH_SHORT).show();
+
+        DownloadHelper.getStreamUrl(currentVideoId, "720p", false, new DownloadHelper.StreamCallback() {
+            @Override
+            public void onSuccess(final String streamUrl, String extension, String mimeType) {
+                pbPlayerLoading.setVisibility(View.GONE);
+                playerMode = 2;
+
+                String html = "<!DOCTYPE html><html><head>" +
+                        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">" +
+                        "<style>" +
+                        "* { margin:0; padding:0; background:#000; }" +
+                        "html, body { width:100%; height:100%; overflow:hidden; display:flex; align-items:center; justify-content:center; }" +
+                        "video { width:100%; height:100%; object-fit:contain; }" +
+                        "</style></head><body>" +
+                        "<video controls autoplay playsinline src=\"" + streamUrl + "\"></video>" +
+                        "</body></html>";
+
+                webViewPlayer.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+                Toast.makeText(PlayerActivity.this, "סרטון מוזרם ישירות!", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onError(String error) {
+                pbPlayerLoading.setVisibility(View.GONE);
+                Toast.makeText(PlayerActivity.this, "לא הצלחנו לחלץ קישור ישיר, נסה להחליף נגן.", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void openInExternalApp() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=1" + currentVideoId));
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "לא נמצאה אפליקציה מתאימה לפתיחה", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showDownloadQualityDialog(final boolean isAudioOnly) {
@@ -176,8 +260,8 @@ public class PlayerActivity extends Activity {
             return;
         }
 
-        final String[] qualities = new String[]{"1080p (איכות גבוהה ביותר)", "720p (איכות HD)", "480p (איכות רגילה)", "360p (חיסכון בנתונים)"};
-        final String[] qualityValues = new String[]{"1080p", "720p", "480p", "360p"};
+        final String[] qualities = new String[]{"איכות גבוהה (720p HD)", "איכות רגילה (480p / 360p)", "איכות מקסימלית (1080p)"};
+        final String[] qualityValues = new String[]{"720p", "360p", "1080p"};
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.select_download_quality)
@@ -192,7 +276,7 @@ public class PlayerActivity extends Activity {
 
     private void startDownloadProcess(String qualityLabel, final boolean isAudioOnly) {
         pbDownloadLoading.setVisibility(View.VISIBLE);
-        Toast.makeText(this, "מכין את קישור ההורדה...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "מכין ומחלץ קישור להורדה...", Toast.LENGTH_SHORT).show();
 
         DownloadHelper.getStreamUrl(currentVideoId, qualityLabel, isAudioOnly, new DownloadHelper.StreamCallback() {
             @Override
@@ -228,6 +312,8 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onDestroy() {
         if (webViewPlayer != null) {
+            webViewPlayer.stopLoading();
+            webViewPlayer.loadUrl("about:blank");
             webViewPlayer.destroy();
         }
         super.onDestroy();

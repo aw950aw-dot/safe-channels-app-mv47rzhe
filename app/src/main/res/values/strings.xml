@@ -20,7 +20,8 @@
     <string name="btn_download_video">הורדת וידאו</string>
     <string name="btn_download_audio">הורדת שמע (MP3)</string>
     <string name="btn_watch_quality">איכות צפייה</string>
-    <string name="btn_switch_server">החלף נגן</string>
+    <string name="btn_direct_stream">הזרמה ישירה</string>
+    <string name="btn_switch_server">החלף שרת נגן</string>
     <string name="select_download_quality">בחר איכות קובץ להורדה:</string>
     <string name="select_watch_quality">בחר איכות צפייה:</string>
     <string name="incorrect_password">סיסמה שגויה!</string>
