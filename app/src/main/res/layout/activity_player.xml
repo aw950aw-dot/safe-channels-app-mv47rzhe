@@ -1,215 +1,230 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0F172A"
-    android:orientation="vertical">
+    android:background="#0F172A">
 
-    <!-- Top Bar -->
-    <RelativeLayout
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:background="#1E293B"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <ImageButton
-            android:id="@+id/btnPlayerBack"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_centerVertical="true"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="חזור"
-            android:src="@drawable/ic_back" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_marginStart="12dp"
-            android:layout_toEndOf="@id/btnPlayerBack"
-            android:text="@string/player_title"
-            android:textColor="#FFFFFF"
-            android:textSize="17sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tvServerBadge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_marginEnd="10dp"
-            android:layout_toStartOf="@id/btnExternalOpen"
-            android:background="@drawable/bg_badge_duration"
-            android:paddingStart="8dp"
-            android:paddingTop="3dp"
-            android:paddingEnd="8dp"
-            android:paddingBottom="3dp"
-            android:text="@string/server_official"
-            android:textColor="#38BDF8"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-
-        <ImageButton
-            android:id="@+id/btnExternalOpen"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="פתח באפליקציה חיצונית"
-            android:src="@drawable/ic_external" />
-    </RelativeLayout>
-
-    <!-- Embedded YouTube / HTML5 Player Frame -->
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="240dp"
-        android:background="#000000">
-
-        <WebView
-            android:id="@+id/webViewPlayer"
+        <!-- Top Bar -->
+        <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="52dp"
+            android:background="#1E293B"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
 
-        <ProgressBar
-            android:id="@+id/pbPlayerLoading"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:visibility="gone" />
-    </FrameLayout>
+            <ImageButton
+                android:id="@+id/btnPlayerBack"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_centerVertical="true"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="חזור"
+                android:src="@drawable/ic_back" />
 
-    <!-- Action Bar (Download & Alternate Engine Controls) -->
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="#1E293B"
-        android:padding="8dp"
-        android:scrollbars="none">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/btnDownloadVideo"
+            <TextView
                 android:layout_width="wrap_content"
-                android:layout_height="38dp"
-                android:background="@drawable/bg_button"
-                android:drawableStart="@drawable/ic_download"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:text="@string/btn_download_video"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="12dp"
+                android:layout_toEndOf="@id/btnPlayerBack"
+                android:text="@string/player_title"
                 android:textColor="#FFFFFF"
-                android:textSize="12sp"
+                android:textSize="17sp"
                 android:textStyle="bold" />
 
-            <Button
-                android:id="@+id/btnDownloadAudio"
+            <TextView
+                android:id="@+id/tvServerBadge"
                 android:layout_width="wrap_content"
-                android:layout_height="38dp"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/bg_button_secondary"
-                android:drawableStart="@drawable/ic_music"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:text="@string/btn_download_audio"
-                android:textColor="#1E293B"
-                android:textSize="12sp"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="10dp"
+                android:layout_toStartOf="@id/btnExternalOpen"
+                android:background="@drawable/bg_badge_duration"
+                android:paddingStart="8dp"
+                android:paddingTop="3dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="3dp"
+                android:text="@string/server_official"
+                android:textColor="#38BDF8"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
-            <Button
-                android:id="@+id/btnDirectStream"
-                android:layout_width="wrap_content"
-                android:layout_height="38dp"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/bg_button_secondary"
-                android:drawableStart="@drawable/ic_play_arrow"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:text="@string/btn_direct_stream"
-                android:textColor="#1E293B"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+            <ImageButton
+                android:id="@+id/btnExternalOpen"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="פתח באפליקציה חיצונית"
+                android:src="@drawable/ic_external" />
+        </RelativeLayout>
 
-            <Button
-                android:id="@+id/btnSwitchServer"
-                android:layout_width="wrap_content"
-                android:layout_height="38dp"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/bg_button_secondary"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:text="@string/btn_switch_server"
-                android:textColor="#1E293B"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+        <!-- Embedded YouTube / HTML5 Player Frame -->
+        <FrameLayout
+            android:id="@+id/flPlayerContainer"
+            android:layout_width="match_parent"
+            android:layout_height="240dp"
+            android:background="#000000">
+
+            <WebView
+                android:id="@+id/webViewPlayer"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
 
             <ProgressBar
-                android:id="@+id/pbDownloadLoading"
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_marginStart="8dp"
+                android:id="@+id/pbPlayerLoading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
                 android:visibility="gone" />
-        </LinearLayout>
-    </HorizontalScrollView>
+        </FrameLayout>
 
-    <!-- Video Metadata -->
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:padding="16dp">
-
-        <LinearLayout
+        <!-- Action Bar (Download & Alternate Engine Controls) -->
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:background="#1E293B"
+            android:padding="8dp"
+            android:scrollbars="none">
 
-            <TextView
-                android:id="@+id/tvPlayerTitle"
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnDownloadVideo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:background="@drawable/bg_button"
+                    android:drawableStart="@drawable/ic_download"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="@string/btn_download_video"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btnDownloadAudio"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_button_secondary"
+                    android:drawableStart="@drawable/ic_music"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="@string/btn_download_audio"
+                    android:textColor="#1E293B"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btnDirectStream"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_button_secondary"
+                    android:drawableStart="@drawable/ic_play_arrow"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="@string/btn_direct_stream"
+                    android:textColor="#1E293B"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btnSwitchServer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_button_secondary"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="@string/btn_switch_server"
+                    android:textColor="#1E293B"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <ProgressBar
+                    android:id="@+id/pbDownloadLoading"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginStart="8dp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- Video Metadata -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:padding="16dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:lineSpacingExtra="3dp"
-                android:textColor="#F8FAFC"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/tvPlayerChannel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textColor="#38BDF8"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/tvPlayerTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingExtra="3dp"
+                    android:textColor="#F8FAFC"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/tvPlayerDate"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="#94A3B8"
-                android:textSize="12sp" />
+                <TextView
+                    android:id="@+id/tvPlayerChannel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="#38BDF8"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="16dp"
-                android:background="#334155" />
+                <TextView
+                    android:id="@+id/tvPlayerDate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="#94A3B8"
+                    android:textSize="12sp" />
 
-            <TextView
-                android:id="@+id/tvPlayerDescription"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:lineSpacingExtra="4dp"
-                android:textColor="#CBD5E1"
-                android:textSize="14sp" />
-        </LinearLayout>
-    </ScrollView>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="16dp"
+                    android:background="#334155" />
 
-</LinearLayout>
+                <TextView
+                    android:id="@+id/tvPlayerDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingExtra="4dp"
+                    android:textColor="#CBD5E1"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </ScrollView>
+
+    </LinearLayout>
+
+    <!-- Fullscreen Video Container Overlay -->
+    <FrameLayout
+        android:id="@+id/flFullscreenContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:visibility="gone" />
+
+</FrameLayout>

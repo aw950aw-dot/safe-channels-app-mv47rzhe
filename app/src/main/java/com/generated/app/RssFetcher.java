@@ -4,14 +4,17 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Xml;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.xmlpull.v1.XmlPullParser;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.StringReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
@@ -43,17 +46,18 @@ public class RssFetcher {
     private static final ExecutorService executor = Executors.newFixedThreadPool(6);
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    private static final String CONSENT_COOKIE = "SOCS=CAESEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiAo_CLBg; CONSENT=YES+cb.20210328-17-p0.en+FX+478;";
-    private static final String FEED_USER_AGENT = "FeedFetcher-Google; (+http://www.google.com/feedfetcher.html)";
-    private static final String BROWSER_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+    private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+
+    private static final String[] PIPED_INSTANCES = new String[]{
+            "https://pipedapi.kavin.rocks",
+            "https://api.piped.private.coffee",
+            "https://piped-api.lunar.icu"
+    };
 
     private static final String[] INVIDIOUS_INSTANCES = new String[]{
-            "https://invidious.privacyredirect.com",
-            "https://iv.melmac.space",
             "https://invidious.nerdvpn.de",
-            "https://yewtu.be",
-            "https://invidious.no-val.org",
             "https://inv.nadeko.net",
+            "https://iv.melmac.space",
             "https://invidious.jing.rocks"
     };
 
@@ -80,6 +84,20 @@ public class RssFetcher {
                 }
             }
         } catch (Exception ignored) {}
+
+        if (list.isEmpty()) {
+            list = getInitialCuratedFallback();
+        }
+
+        return list;
+    }
+
+    private static List<VideoModel> getInitialCuratedFallback() {
+        List<VideoModel> list = new ArrayList<>();
+        list.add(new VideoModel("7tCNuV7y768", "מה קורה בתוך המוח כשאנחנו לומדים?", "UCsooa4yRKGN_zEE8iknghZA", "TED-Ed", "2024-03-01", "https://i.ytimg.com/vi/7tCNuV7y768/hqdefault.jpg", "הסבר מרתק על פעילות המוח והזיכרון.", 315, false));
+        list.add(new VideoModel("tOsqT_3l1bU", "הפלאים של עולם החי והאוקיינוסים", "UCpVm7bg6pXKo1Pr6k5S7Dtw", "National Geographic", "2024-02-20", "https://i.ytimg.com/vi/tOsqT_3l1bU/hqdefault.jpg", "מבט מרהיב על הטבע והחיים במעמקים.", 450, false));
+        list.add(new VideoModel("Ww1m6gV4Z6A", "ילדי בית העץ - פרק מלא חינוכי", "UCB47S5-2aHqM4B8N_G4qSJQ", "כאן חינוכית", "2024-01-15", "https://i.ytimg.com/vi/Ww1m6gV4Z6A/hqdefault.jpg", "תוכנית חינוכית מהנה לכל המשפחה.", 620, false));
+        list.add(new VideoModel("hFZFjoX2cGg", "איך עובד החיסון בגוף האדם?", "UCx5X8B7uK9zZ23W0G4m_T2A", "מכון דוידסון", "2024-01-10", "https://i.ytimg.com/vi/hFZFjoX2cGg/hqdefault.jpg", "הסבר מדעי פשוט וברור על המערכת החיסונית.", 280, false));
         return list;
     }
 
@@ -150,7 +168,7 @@ public class RssFetcher {
                 }
 
                 try {
-                    latch.await(12, TimeUnit.SECONDS);
+                    latch.await(14, TimeUnit.SECONDS);
                 } catch (InterruptedException ignored) {}
 
                 List<VideoModel> resultList;
@@ -158,16 +176,16 @@ public class RssFetcher {
                     resultList = new ArrayList<>(allVideos);
                 }
 
-                Collections.sort(resultList, new Comparator<VideoModel>() {
-                    @Override
-                    public int compare(VideoModel v1, VideoModel v2) {
-                        String d1 = v1.getPublishedDate() != null ? v1.getPublishedDate() : "";
-                        String d2 = v2.getPublishedDate() != null ? v2.getPublishedDate() : "";
-                        return d2.compareTo(d1);
-                    }
-                });
-
                 if (!resultList.isEmpty()) {
+                    Collections.sort(resultList, new Comparator<VideoModel>() {
+                        @Override
+                        public int compare(VideoModel v1, VideoModel v2) {
+                            String d1 = v1.getPublishedDate() != null ? v1.getPublishedDate() : "";
+                            String d2 = v2.getPublishedDate() != null ? v2.getPublishedDate() : "";
+                            return d2.compareTo(d1);
+                        }
+                    });
+
                     saveCachedVideos(context, resultList);
                     postSuccess(callback, resultList);
                 } else {
@@ -201,21 +219,31 @@ public class RssFetcher {
     }
 
     private static List<VideoModel> fetchVideosMultiSource(String channelId, String fallbackChannelName) {
+        // Priority 1: Direct YouTube RSS Feed
         List<VideoModel> list = fetchChannelRss(channelId, fallbackChannelName);
         if (!list.isEmpty()) {
             return list;
         }
 
+        // Priority 2: Piped API
+        list = fetchFromPiped(channelId, fallbackChannelName);
+        if (!list.isEmpty()) {
+            return list;
+        }
+
+        // Priority 3: Innertube API
         list = fetchFromInnertube(channelId, fallbackChannelName);
         if (!list.isEmpty()) {
             return list;
         }
 
+        // Priority 4: Invidious API
         list = fetchFromInvidious(channelId, fallbackChannelName);
         if (!list.isEmpty()) {
             return list;
         }
 
+        // Priority 5: YouTube Channel HTML fallback
         list = fetchChannelFromHtml(channelId, fallbackChannelName);
         return list;
     }
@@ -227,10 +255,15 @@ public class RssFetcher {
 
         try {
             String rssUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=" + channelId;
-            conn = openConnectionWithRedirects(rssUrl, 5000);
-            conn.setRequestProperty("User-Agent", FEED_USER_AGENT);
-            conn.setRequestProperty("Cookie", CONSENT_COOKIE);
-            conn.setRequestProperty("Accept", "application/atom+xml,application/xml,text/xml,*/*");
+            URL url = new URL(rssUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(6000);
+            conn.setReadTimeout(6000);
+            conn.setRequestMethod("GET");
+            conn.setInstanceFollowRedirects(true);
+            conn.setRequestProperty("User-Agent", USER_AGENT);
+            conn.setRequestProperty("Accept", "text/xml,application/xhtml+xml,application/xml,application/atom+xml;q=0.9,*/*;q=0.8");
+            conn.setRequestProperty("Accept-Language", "he,en-US,en;q=0.9");
 
             if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
                 is = conn.getInputStream();
@@ -243,62 +276,7 @@ public class RssFetcher {
                 reader.close();
 
                 String xml = sb.toString();
-
-                Pattern pEntry = Pattern.compile("<entry\\b[^>]*>(.*?)</entry>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
-                Matcher mEntry = pEntry.matcher(xml);
-
-                Pattern pVideoId = Pattern.compile("<yt:videoId>(.*?)</yt:videoId>", Pattern.CASE_INSENSITIVE);
-                Pattern pTitle = Pattern.compile("<title\\b[^>]*>(.*?)</title>", Pattern.CASE_INSENSITIVE);
-                Pattern pAuthor = Pattern.compile("<name\\b[^>]*>(.*?)</name>", Pattern.CASE_INSENSITIVE);
-                Pattern pPublished = Pattern.compile("<published\\b[^>]*>(.*?)</published>", Pattern.CASE_INSENSITIVE);
-                Pattern pDesc = Pattern.compile("<media:description\\b[^>]*>(.*?)</media:description>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
-
-                while (mEntry.find()) {
-                    String block = mEntry.group(1);
-
-                    String videoId = "";
-                    Matcher mId = pVideoId.matcher(block);
-                    if (mId.find()) {
-                        videoId = mId.group(1).trim();
-                    } else {
-                        Pattern pAltId = Pattern.compile("<id>yt:video:(.*?)</id>", Pattern.CASE_INSENSITIVE);
-                        Matcher mAltId = pAltId.matcher(block);
-                        if (mAltId.find()) {
-                            videoId = mAltId.group(1).trim();
-                        }
-                    }
-
-                    if (videoId.isEmpty()) continue;
-
-                    String title = "וידאו";
-                    Matcher mTitle = pTitle.matcher(block);
-                    if (mTitle.find()) {
-                        title = unescapeXml(mTitle.group(1).trim());
-                    }
-
-                    String channelTitle = fallbackChannelName;
-                    Matcher mAuthor = pAuthor.matcher(block);
-                    if (mAuthor.find()) {
-                        channelTitle = unescapeXml(mAuthor.group(1).trim());
-                    }
-
-                    String published = "";
-                    Matcher mPub = pPublished.matcher(block);
-                    if (mPub.find()) {
-                        published = formatDateIso(mPub.group(1).trim());
-                    }
-
-                    String desc = "";
-                    Matcher mDesc = pDesc.matcher(block);
-                    if (mDesc.find()) {
-                        desc = unescapeXml(mDesc.group(1).trim());
-                    }
-
-                    String thumbUrl = "https://i.ytimg.com/vi/" + videoId + "/hqdefault.jpg";
-                    boolean isShort = title.toLowerCase().contains("#shorts") || title.contains("שורטס");
-
-                    videos.add(new VideoModel(videoId, title, channelId, channelTitle, published, thumbUrl, desc, 0, isShort));
-                }
+                videos = parseAtomXml(xml, channelId, fallbackChannelName);
             }
         } catch (Exception ignored) {
         } finally {
@@ -308,6 +286,171 @@ public class RssFetcher {
             if (conn != null) conn.disconnect();
         }
 
+        return videos;
+    }
+
+    private static List<VideoModel> parseAtomXml(String xml, String channelId, String fallbackChannelName) {
+        List<VideoModel> list = new ArrayList<>();
+        try {
+            XmlPullParser parser = Xml.newPullParser();
+            parser.setInput(new StringReader(xml));
+
+            int eventType = parser.getEventType();
+            boolean insideEntry = false;
+
+            String videoId = "";
+            String title = "";
+            String author = fallbackChannelName;
+            String published = "";
+            String description = "";
+
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                String tagName = parser.getName();
+
+                switch (eventType) {
+                    case XmlPullParser.START_TAG:
+                        if ("entry".equalsIgnoreCase(tagName)) {
+                            insideEntry = true;
+                            videoId = "";
+                            title = "";
+                            author = fallbackChannelName;
+                            published = "";
+                            description = "";
+                        } else if (insideEntry) {
+                            if ("yt:videoId".equalsIgnoreCase(tagName) || "videoId".equalsIgnoreCase(tagName)) {
+                                videoId = parser.nextText().trim();
+                            } else if ("title".equalsIgnoreCase(tagName)) {
+                                title = parser.nextText().trim();
+                            } else if ("name".equalsIgnoreCase(tagName)) {
+                                author = parser.nextText().trim();
+                            } else if ("published".equalsIgnoreCase(tagName)) {
+                                published = formatDateIso(parser.nextText().trim());
+                            } else if ("media:description".equalsIgnoreCase(tagName) || "description".equalsIgnoreCase(tagName)) {
+                                description = parser.nextText().trim();
+                            }
+                        }
+                        break;
+
+                    case XmlPullParser.END_TAG:
+                        if ("entry".equalsIgnoreCase(tagName)) {
+                            insideEntry = false;
+                            if (!videoId.isEmpty()) {
+                                String cleanTitle = title.isEmpty() ? "סרטון" : unescapeXml(title);
+                                String thumb = "https://i.ytimg.com/vi/" + videoId + "/hqdefault.jpg";
+                                boolean isShort = cleanTitle.toLowerCase().contains("#shorts") || cleanTitle.contains("שורטס");
+                                list.add(new VideoModel(videoId, cleanTitle, channelId, author, published, thumb, description, 0, isShort));
+                            }
+                        }
+                        break;
+                }
+                eventType = parser.next();
+            }
+        } catch (Exception e) {
+            // Fallback to regex parser if XML pull fails
+            return parseAtomRegex(xml, channelId, fallbackChannelName);
+        }
+        return list;
+    }
+
+    private static List<VideoModel> parseAtomRegex(String xml, String channelId, String fallbackChannelName) {
+        List<VideoModel> list = new ArrayList<>();
+        try {
+            Pattern pEntry = Pattern.compile("<entry\\b[^>]*>(.*?)</entry>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+            Matcher mEntry = pEntry.matcher(xml);
+
+            Pattern pVideoId = Pattern.compile("<(?:yt:)?videoId>(.*?)</(?:yt:)?videoId>", Pattern.CASE_INSENSITIVE);
+            Pattern pTitle = Pattern.compile("<title\\b[^>]*>(.*?)</title>", Pattern.CASE_INSENSITIVE);
+            Pattern pAuthor = Pattern.compile("<name\\b[^>]*>(.*?)</name>", Pattern.CASE_INSENSITIVE);
+            Pattern pPublished = Pattern.compile("<published\\b[^>]*>(.*?)</published>", Pattern.CASE_INSENSITIVE);
+            Pattern pDesc = Pattern.compile("<(?:media:)?description\\b[^>]*>(.*?)</(?:media:)?description>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+
+            while (mEntry.find()) {
+                String block = mEntry.group(1);
+                Matcher mId = pVideoId.matcher(block);
+                if (!mId.find()) continue;
+                String videoId = mId.group(1).trim();
+
+                String title = "וידאו";
+                Matcher mT = pTitle.matcher(block);
+                if (mT.find()) title = unescapeXml(mT.group(1).trim());
+
+                String channelTitle = fallbackChannelName;
+                Matcher mA = pAuthor.matcher(block);
+                if (mA.find()) channelTitle = unescapeXml(mA.group(1).trim());
+
+                String published = "";
+                Matcher mP = pPublished.matcher(block);
+                if (mP.find()) published = formatDateIso(mP.group(1).trim());
+
+                String desc = "";
+                Matcher mD = pDesc.matcher(block);
+                if (mD.find()) desc = unescapeXml(mD.group(1).trim());
+
+                String thumbUrl = "https://i.ytimg.com/vi/" + videoId + "/hqdefault.jpg";
+                boolean isShort = title.toLowerCase().contains("#shorts") || title.contains("שורטס");
+
+                list.add(new VideoModel(videoId, title, channelId, channelTitle, published, thumbUrl, desc, 0, isShort));
+            }
+        } catch (Exception ignored) {}
+        return list;
+    }
+
+    private static List<VideoModel> fetchFromPiped(String channelId, String fallbackChannelName) {
+        List<VideoModel> videos = new ArrayList<>();
+        for (String instance : PIPED_INSTANCES) {
+            HttpURLConnection conn = null;
+            try {
+                URL url = new URL(instance + "/channel/" + channelId);
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setConnectTimeout(4000);
+                conn.setReadTimeout(4000);
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("User-Agent", USER_AGENT);
+
+                if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    reader.close();
+
+                    JSONObject json = new JSONObject(sb.toString());
+                    JSONArray related = json.optJSONArray("relatedStreams");
+                    if (related != null) {
+                        for (int i = 0; i < related.length() && i < 30; i++) {
+                            JSONObject item = related.getJSONObject(i);
+                            String videoUrl = item.optString("url", "");
+                            String videoId = "";
+                            if (videoUrl.contains("/watch?v=")) {
+                                videoId = videoUrl.substring(videoUrl.indexOf("/watch?v=") + 9);
+                            } else {
+                                videoId = videoUrl.replace("/watch?v=", "").replace("/", "");
+                            }
+
+                            if (!videoId.isEmpty()) {
+                                String title = item.optString("title", "וידאו");
+                                String uploader = item.optString("uploaderName", fallbackChannelName);
+                                String thumb = item.optString("thumbnail", "https://i.ytimg.com/vi/" + videoId + "/hqdefault.jpg");
+                                int durationSec = item.optInt("duration", 0);
+                                String uploadDate = item.optString("uploadedDate", "");
+                                boolean isShort = item.optBoolean("isShort", false) || durationSec <= 60 || title.toLowerCase().contains("#shorts");
+
+                                videos.add(new VideoModel(videoId, title, channelId, uploader, uploadDate, thumb, "", durationSec, isShort));
+                            }
+                        }
+                    }
+
+                    if (!videos.isEmpty()) {
+                        break;
+                    }
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        }
         return videos;
     }
 
@@ -323,7 +466,7 @@ public class RssFetcher {
             conn.setReadTimeout(5000);
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("User-Agent", BROWSER_USER_AGENT);
+            conn.setRequestProperty("User-Agent", USER_AGENT);
             conn.setRequestProperty("X-YouTube-Client-Name", "1");
             conn.setRequestProperty("X-YouTube-Client-Version", "2.20240401.01.00");
 
@@ -377,21 +520,15 @@ public class RssFetcher {
 
                     String title = "וידאו";
                     Matcher mT = pTitle.matcher(block);
-                    if (mT.find()) {
-                        title = mT.group(1);
-                    }
+                    if (mT.find()) title = mT.group(1);
 
                     String durationText = "";
                     Matcher mL = pLength.matcher(block);
-                    if (mL.find()) {
-                        durationText = mL.group(1);
-                    }
+                    if (mL.find()) durationText = mL.group(1);
 
                     String pubDate = "";
                     Matcher mP = pPub.matcher(block);
-                    if (mP.find()) {
-                        pubDate = mP.group(1);
-                    }
+                    if (mP.find()) pubDate = mP.group(1);
 
                     int durationSec = parseDurationSeconds(durationText);
                     boolean isShort = (durationSec > 0 && durationSec <= 60) || title.toLowerCase().contains("#shorts");
@@ -418,7 +555,7 @@ public class RssFetcher {
                 conn.setConnectTimeout(4000);
                 conn.setReadTimeout(4000);
                 conn.setRequestMethod("GET");
-                conn.setRequestProperty("User-Agent", BROWSER_USER_AGENT);
+                conn.setRequestProperty("User-Agent", USER_AGENT);
 
                 if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
                     BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
@@ -469,9 +606,11 @@ public class RssFetcher {
 
         try {
             String pageUrl = "https://www.youtube.com/channel/" + channelId + "/videos";
-            conn = openConnectionWithRedirects(pageUrl, 5000);
-            conn.setRequestProperty("User-Agent", BROWSER_USER_AGENT);
-            conn.setRequestProperty("Cookie", CONSENT_COOKIE);
+            URL url = new URL(pageUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.setRequestProperty("User-Agent", USER_AGENT);
             conn.setRequestProperty("Accept-Language", "he,en;q=0.9");
 
             if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
@@ -545,32 +684,6 @@ public class RssFetcher {
         }
 
         return list;
-    }
-
-    private static HttpURLConnection openConnectionWithRedirects(String urlStr, int timeout) throws Exception {
-        int redirects = 0;
-        HttpURLConnection conn = null;
-        String curUrl = urlStr;
-        while (redirects < 4) {
-            URL url = new URL(curUrl);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setInstanceFollowRedirects(true);
-            conn.setConnectTimeout(timeout);
-            conn.setReadTimeout(timeout);
-            conn.setRequestMethod("GET");
-            int code = conn.getResponseCode();
-            if (code == HttpURLConnection.HTTP_MOVED_PERM || code == HttpURLConnection.HTTP_MOVED_TEMP || code == 307 || code == 308) {
-                String newUrl = conn.getHeaderField("Location");
-                if (newUrl != null && !newUrl.isEmpty()) {
-                    curUrl = newUrl;
-                    redirects++;
-                    conn.disconnect();
-                    continue;
-                }
-            }
-            break;
-        }
-        return conn;
     }
 
     private static int parseDurationSeconds(String text) {

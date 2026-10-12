@@ -34,7 +34,7 @@
 
         <activity
             android:name=".PlayerActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
             android:hardwareAccelerated="true"
             android:exported="false"
             android:label="@string/player_title" />
