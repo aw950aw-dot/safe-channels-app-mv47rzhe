@@ -1,6 +1,7 @@
 package com.generated.app;
 
 import android.app.DownloadManager;
+import android.content.ContentValues;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Build;
@@ -8,6 +9,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.DocumentsContract;
+import android.provider.MediaStore;
 import android.widget.Toast;
 
 import org.json.JSONArray;
@@ -31,65 +33,77 @@ public class DownloadHelper {
         void onError(String error);
     }
 
-    private static final ExecutorService executor = Executors.newFixedThreadPool(6);
+    private static final ExecutorService executor = Executors.newFixedThreadPool(8);
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
     public static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 
-    // Resilient, updated public mirror APIs
+    // Resilient mirror instances
     private static final String[] COBALT_INSTANCES = new String[]{
             "https://api.cobalt.tools",
-            "https://cobalt-api.kwiatekm.tokyo",
-            "https://co.wuk.sh"
+            "https://cobalt.api.scip.io",
+            "https://capi.wuk.sh",
+            "https://cobalt.canine.tools",
+            "https://api.server.garden",
+            "https://cobalt-api.kwiatekm.tokyo"
     };
 
     private static final String[] INVIDIOUS_INSTANCES = new String[]{
-            "https://inv.nadeko.net",
             "https://invidious.nerdvpn.de",
+            "https://inv.nadeko.net",
             "https://iv.melmac.space",
             "https://yt.artemislena.eu",
-            "https://invidious.jing.rocks"
+            "https://invidious.jing.rocks",
+            "https://invidious.privacydev.net",
+            "https://inv.tux.pizza"
     };
 
     private static final String[] PIPED_INSTANCES = new String[]{
-            "https://pipedapi.kavin.rocks",
             "https://api.piped.private.coffee",
+            "https://pipedapi.kavin.rocks",
             "https://piped-api.lunar.icu",
-            "https://api.piped.privacydev.net"
+            "https://pipedapi.tokhmi.xyz"
     };
 
     public static void getStreamUrl(final String videoId, final String targetQuality, final boolean isAudioOnly, final StreamCallback callback) {
         executor.submit(new Runnable() {
             @Override
             public void run() {
-                // Method 1: Innertube Android Client (Direct Google Video links with no signature encryption)
-                StreamResult innertubeResult = fetchFromInnertube(videoId, targetQuality, isAudioOnly);
-                if (innertubeResult != null) {
-                    postSuccess(callback, innertubeResult.url, innertubeResult.extension, innertubeResult.mimeType);
+                // Method 1: Innertube iOS Client (unthrottled, unciphered stream formats)
+                StreamResult iosResult = fetchFromInnertubeIos(videoId, targetQuality, isAudioOnly);
+                if (iosResult != null) {
+                    postSuccess(callback, iosResult.url, iosResult.extension, iosResult.mimeType);
                     return;
                 }
 
-                // Method 2: Cobalt API (High Quality direct download CDN link)
+                // Method 2: Innertube TV Embedded Client (clean stream formats)
+                StreamResult tvResult = fetchFromInnertubeTv(videoId, targetQuality, isAudioOnly);
+                if (tvResult != null) {
+                    postSuccess(callback, tvResult.url, tvResult.extension, tvResult.mimeType);
+                    return;
+                }
+
+                // Method 3: Multi-cluster Cobalt API (v10 and legacy endpoints)
                 StreamResult cobaltResult = fetchFromCobalt(videoId, targetQuality, isAudioOnly);
                 if (cobaltResult != null) {
                     postSuccess(callback, cobaltResult.url, cobaltResult.extension, cobaltResult.mimeType);
                     return;
                 }
 
-                // Method 3: Invidious Instances
+                // Method 4: Invidious Instances (formatStreams & adaptiveFormats)
                 StreamResult invidiousResult = fetchFromInvidious(videoId, targetQuality, isAudioOnly);
                 if (invidiousResult != null) {
                     postSuccess(callback, invidiousResult.url, invidiousResult.extension, invidiousResult.mimeType);
                     return;
                 }
 
-                // Method 4: Piped Instances
+                // Method 5: Piped Instances
                 StreamResult pipedResult = fetchFromPiped(videoId, targetQuality, isAudioOnly);
                 if (pipedResult != null) {
                     postSuccess(callback, pipedResult.url, pipedResult.extension, pipedResult.mimeType);
                     return;
                 }
 
-                // Method 5: Direct Invidious Proxy Stream Fallback
+                // Method 6: Direct Invidious Proxy Stream
                 for (String host : INVIDIOUS_INSTANCES) {
                     try {
                         String directUrl;
@@ -113,7 +127,7 @@ public class DownloadHelper {
                     } catch (Exception ignored) {}
                 }
 
-                postError(callback, "לא הצלחנו לחלץ קישור מדיה עבור סרטון זה.");
+                postError(callback, "לא הצלחנו לחלץ קישור הורדה ישיר עבור סרטון זה ממקורות השרת.");
             }
         });
     }
@@ -130,28 +144,34 @@ public class DownloadHelper {
         }
     }
 
-    private static StreamResult fetchFromInnertube(String videoId, String targetQuality, boolean isAudioOnly) {
+    /**
+     * Innertube iOS Client - delivers un-throttled URLs with complete parameters.
+     */
+    private static StreamResult fetchFromInnertubeIos(String videoId, String targetQuality, boolean isAudioOnly) {
         HttpURLConnection conn = null;
         try {
             URL url = new URL("https://www.youtube.com/youtubei/v1/player?prettyPrint=false");
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
-            conn.setConnectTimeout(6000);
-            conn.setReadTimeout(6000);
+            conn.setConnectTimeout(6500);
+            conn.setReadTimeout(6500);
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("User-Agent", "com.google.android.youtube/19.29.35 (Linux; U; Android 11) gzip");
-            conn.setRequestProperty("X-YouTube-Client-Name", "3");
-            conn.setRequestProperty("X-YouTube-Client-Version", "19.29.35");
+            conn.setRequestProperty("User-Agent", "com.google.ios.youtube/19.29.1 (iPhone14,3; U; CPU iOS 17_5 like Mac OS X; en_US)");
+            conn.setRequestProperty("X-YouTube-Client-Name", "5");
+            conn.setRequestProperty("X-YouTube-Client-Version", "19.29.1");
 
             JSONObject payload = new JSONObject();
             payload.put("videoId", videoId);
 
             JSONObject context = new JSONObject();
             JSONObject client = new JSONObject();
-            client.put("clientName", "ANDROID");
-            client.put("clientVersion", "19.29.35");
-            client.put("androidSdkVersion", 30);
+            client.put("clientName", "IOS");
+            client.put("clientVersion", "19.29.1");
+            client.put("deviceMake", "Apple");
+            client.put("deviceModel", "iPhone14,3");
+            client.put("osName", "iOS");
+            client.put("osVersion", "17.5.0.21F79");
             client.put("hl", "en");
             client.put("gl", "US");
             context.put("client", client);
@@ -174,60 +194,124 @@ public class DownloadHelper {
                 JSONObject json = new JSONObject(sb.toString());
                 JSONObject streamingData = json.optJSONObject("streamingData");
                 if (streamingData != null) {
-                    if (isAudioOnly) {
-                        JSONArray adaptive = streamingData.optJSONArray("adaptiveFormats");
-                        if (adaptive != null) {
-                            String bestAudioUrl = null;
-                            int bestBitrate = 0;
-                            String bestExt = "m4a";
-                            String bestMime = "audio/mp4";
-
-                            for (int i = 0; i < adaptive.length(); i++) {
-                                JSONObject fmt = adaptive.getJSONObject(i);
-                                String mime = fmt.optString("mimeType", "");
-                                if (mime.startsWith("audio/")) {
-                                    String directUrl = fmt.optString("url", "");
-                                    int bitrate = fmt.optInt("bitrate", 0);
-                                    if (!directUrl.isEmpty() && bitrate >= bestBitrate) {
-                                        bestBitrate = bitrate;
-                                        bestAudioUrl = directUrl;
-                                        bestMime = mime.contains(";") ? mime.substring(0, mime.indexOf(";")).trim() : mime;
-                                        bestExt = mime.contains("mp4") || mime.contains("m4a") ? "m4a" : "mp3";
-                                    }
-                                }
-                            }
-                            if (bestAudioUrl != null) {
-                                return new StreamResult(bestAudioUrl, bestExt, bestMime);
-                            }
-                        }
-                    } else {
-                        // Standard formats (video with combined audio)
-                        JSONArray formats = streamingData.optJSONArray("formats");
-                        if (formats != null && formats.length() > 0) {
-                            for (int i = 0; i < formats.length(); i++) {
-                                JSONObject fmt = formats.getJSONObject(i);
-                                String qLabel = fmt.optString("qualityLabel", "");
-                                String directUrl = fmt.optString("url", "");
-                                if (!directUrl.isEmpty()) {
-                                    if (targetQuality != null && qLabel.contains(targetQuality)) {
-                                        return new StreamResult(directUrl, "mp4", "video/mp4");
-                                    }
-                                }
-                            }
-                            // Default to first combined format
-                            JSONObject first = formats.getJSONObject(0);
-                            String directUrl = first.optString("url", "");
-                            if (!directUrl.isEmpty()) {
-                                return new StreamResult(directUrl, "mp4", "video/mp4");
-                            }
-                        }
-                    }
+                    return parseStreamingData(streamingData, targetQuality, isAudioOnly);
                 }
             }
         } catch (Exception ignored) {
         } finally {
             if (conn != null) conn.disconnect();
         }
+        return null;
+    }
+
+    /**
+     * Innertube TV HTML5 embedded client.
+     */
+    private static StreamResult fetchFromInnertubeTv(String videoId, String targetQuality, boolean isAudioOnly) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL("https://www.youtube.com/youtubei/v1/player?prettyPrint=false");
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setConnectTimeout(6500);
+            conn.setReadTimeout(6500);
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/5.0 TV Safari/538.1");
+            conn.setRequestProperty("X-YouTube-Client-Name", "85");
+            conn.setRequestProperty("X-YouTube-Client-Version", "2.0");
+
+            JSONObject payload = new JSONObject();
+            payload.put("videoId", videoId);
+
+            JSONObject context = new JSONObject();
+            JSONObject client = new JSONObject();
+            client.put("clientName", "TVHTML5_SIMPLY_EMBEDDED_PLAYER");
+            client.put("clientVersion", "2.0");
+            client.put("hl", "en");
+            client.put("gl", "US");
+            context.put("client", client);
+
+            JSONObject thirdParty = new JSONObject();
+            thirdParty.put("embedUrl", "https://www.youtube.com");
+            payload.put("context", context);
+            payload.put("thirdParty", thirdParty);
+
+            OutputStream os = conn.getOutputStream();
+            os.write(payload.toString().getBytes("UTF-8"));
+            os.flush();
+            os.close();
+
+            if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
+                }
+                reader.close();
+
+                JSONObject json = new JSONObject(sb.toString());
+                JSONObject streamingData = json.optJSONObject("streamingData");
+                if (streamingData != null) {
+                    return parseStreamingData(streamingData, targetQuality, isAudioOnly);
+                }
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+        return null;
+    }
+
+    private static StreamResult parseStreamingData(JSONObject streamingData, String targetQuality, boolean isAudioOnly) {
+        try {
+            if (isAudioOnly) {
+                JSONArray adaptive = streamingData.optJSONArray("adaptiveFormats");
+                if (adaptive != null) {
+                    String bestAudioUrl = null;
+                    int bestBitrate = 0;
+                    String bestExt = "m4a";
+                    String bestMime = "audio/mp4";
+
+                    for (int i = 0; i < adaptive.length(); i++) {
+                        JSONObject fmt = adaptive.getJSONObject(i);
+                        String mime = fmt.optString("mimeType", "");
+                        if (mime.startsWith("audio/")) {
+                            String directUrl = fmt.optString("url", "");
+                            int bitrate = fmt.optInt("bitrate", 0);
+                            if (!directUrl.isEmpty() && bitrate >= bestBitrate) {
+                                bestBitrate = bitrate;
+                                bestAudioUrl = directUrl;
+                                bestMime = mime.contains(";") ? mime.substring(0, mime.indexOf(";")).trim() : mime;
+                                bestExt = (mime.contains("mp4") || mime.contains("m4a")) ? "m4a" : "mp3";
+                            }
+                        }
+                    }
+                    if (bestAudioUrl != null) {
+                        return new StreamResult(bestAudioUrl, bestExt, bestMime);
+                    }
+                }
+            } else {
+                JSONArray formats = streamingData.optJSONArray("formats");
+                if (formats != null && formats.length() > 0) {
+                    for (int i = 0; i < formats.length(); i++) {
+                        JSONObject fmt = formats.getJSONObject(i);
+                        String qLabel = fmt.optString("qualityLabel", "");
+                        String directUrl = fmt.optString("url", "");
+                        if (!directUrl.isEmpty() && targetQuality != null && qLabel.contains(targetQuality)) {
+                            return new StreamResult(directUrl, "mp4", "video/mp4");
+                        }
+                    }
+                    // Default to highest resolution combined format available
+                    JSONObject first = formats.getJSONObject(0);
+                    String directUrl = first.optString("url", "");
+                    if (!directUrl.isEmpty()) {
+                        return new StreamResult(directUrl, "mp4", "video/mp4");
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
         return null;
     }
 
@@ -238,13 +322,14 @@ public class DownloadHelper {
                 URL url = new URL(cobaltBase + "/");
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
+                conn.setConnectTimeout(4500);
+                conn.setReadTimeout(5500);
                 conn.setDoOutput(true);
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setRequestProperty("Accept", "application/json");
                 conn.setRequestProperty("User-Agent", USER_AGENT);
 
+                // Cobalt v10 standard payload
                 JSONObject body = new JSONObject();
                 body.put("url", "https://www.youtube.com/watch?v=" + videoId);
                 if (isAudioOnly) {
@@ -275,6 +360,9 @@ public class DownloadHelper {
 
                     JSONObject json = new JSONObject(sb.toString());
                     String stream = json.optString("url", "");
+                    if (stream.isEmpty()) {
+                        stream = json.optString("text", "");
+                    }
                     if (!stream.isEmpty()) {
                         String ext = isAudioOnly ? "mp3" : "mp4";
                         String mime = isAudioOnly ? "audio/mpeg" : "video/mp4";
@@ -420,13 +508,13 @@ public class DownloadHelper {
         String customTreeUriStr = isAudio ? dm.getAudioTreeUri() : dm.getVideoTreeUri();
         String folderSetting = isAudio ? dm.getAudioDownloadFolder() : dm.getVideoDownloadFolder();
 
-        // 1. If user selected a custom directory via Storage Access Framework (ACTION_OPEN_DOCUMENT_TREE)
+        // 1. If user selected a custom directory via Storage Access Framework
         if (DataManager.FOLDER_CUSTOM_TREE.equals(folderSetting) && customTreeUriStr != null && !customTreeUriStr.isEmpty()) {
             downloadToDocumentTree(context, title, downloadUrl, extension, mimeType, customTreeUriStr, isAudio);
             return;
         }
 
-        // 2. Standard Public Storage (DownloadManager or fallback to direct file stream)
+        // 2. Standard Public Storage (DownloadManager or MediaStore writer)
         downloadToPublicStorage(context, title, downloadUrl, extension, mimeType, isAudio, folderSetting);
     }
 
@@ -462,7 +550,7 @@ public class DownloadHelper {
                     conn.setRequestProperty("User-Agent", USER_AGENT);
                     conn.setRequestProperty("Referer", "https://www.youtube.com/");
                     conn.setConnectTimeout(15000);
-                    conn.setReadTimeout(20000);
+                    conn.setReadTimeout(25000);
                     conn.setInstanceFollowRedirects(true);
 
                     int respCode = conn.getResponseCode();
@@ -493,8 +581,7 @@ public class DownloadHelper {
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            Toast.makeText(context, "שגיאה בהורדה לתיקייה המותאמת: " + e.getMessage() + ". מנסה שמירה רגילה...", Toast.LENGTH_LONG).show();
-                            // Fallback to regular download
+                            Toast.makeText(context, "שגיאה בהורדה לתיקייה המותאמת. שומר בהורדות הראשיות...", Toast.LENGTH_SHORT).show();
                             downloadToPublicStorage(context, title, downloadUrl, extension, mimeType, isAudio, DataManager.FOLDER_DEFAULT_DOWNLOADS);
                         }
                     });
@@ -508,7 +595,6 @@ public class DownloadHelper {
     }
 
     private static void downloadToPublicStorage(final Context context, final String title, final String downloadUrl, final String extension, final String mimeType, final boolean isAudio, final String targetFolderKey) {
-        // Try Android DownloadManager first
         try {
             DownloadManager downloadManager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
             if (downloadManager != null) {
@@ -525,14 +611,10 @@ public class DownloadHelper {
                 request.addRequestHeader("User-Agent", USER_AGENT);
                 request.addRequestHeader("Referer", "https://www.youtube.com/");
 
-                if (DataManager.FOLDER_DEFAULT_MUSIC.equalsIgnoreCase(targetFolderKey)) {
+                if (DataManager.FOLDER_DEFAULT_MUSIC.equalsIgnoreCase(targetFolderKey) && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                     request.setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, filename);
-                } else if (DataManager.FOLDER_DEFAULT_MOVIES.equalsIgnoreCase(targetFolderKey)) {
+                } else if (DataManager.FOLDER_DEFAULT_MOVIES.equalsIgnoreCase(targetFolderKey) && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                     request.setDestinationInExternalPublicDir(Environment.DIRECTORY_MOVIES, filename);
-                } else if (DataManager.FOLDER_SAFETUBE_MUSIC.equalsIgnoreCase(targetFolderKey)) {
-                    request.setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, "SafeTube/" + filename);
-                } else if (DataManager.FOLDER_SAFETUBE_VIDEOS.equalsIgnoreCase(targetFolderKey)) {
-                    request.setDestinationInExternalPublicDir(Environment.DIRECTORY_MOVIES, "SafeTube/" + filename);
                 } else {
                     request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
                 }
@@ -549,11 +631,11 @@ public class DownloadHelper {
             ex.printStackTrace();
         }
 
-        // Direct Stream Saver Fallback:
-        downloadDirectlyToFile(context, title, downloadUrl, extension, targetFolderKey);
+        // Direct Stream Saver Fallback (compatible with Android 10+ Scoped Storage)
+        downloadDirectlyWithMediaStore(context, title, downloadUrl, extension, mimeType, isAudio, targetFolderKey);
     }
 
-    private static void downloadDirectlyToFile(final Context context, final String title, final String downloadUrl, final String extension, final String targetFolderKey) {
+    private static void downloadDirectlyWithMediaStore(final Context context, final String title, final String downloadUrl, final String extension, final String mimeType, final boolean isAudio, final String targetFolderKey) {
         Toast.makeText(context, "מתחיל הורדה ישירה למכשיר...", Toast.LENGTH_SHORT).show();
 
         executor.submit(new Runnable() {
@@ -561,36 +643,58 @@ public class DownloadHelper {
             public void run() {
                 HttpURLConnection conn = null;
                 InputStream in = null;
-                FileOutputStream out = null;
+                OutputStream out = null;
+                Uri itemUri = null;
+
                 try {
                     String cleanTitle = sanitizeFilename(title);
                     String fileName = cleanTitle + "_" + System.currentTimeMillis() + "." + extension;
 
-                    File targetDir;
-                    if (DataManager.FOLDER_DEFAULT_MUSIC.equalsIgnoreCase(targetFolderKey)) {
-                        targetDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC);
-                    } else if (DataManager.FOLDER_DEFAULT_MOVIES.equalsIgnoreCase(targetFolderKey)) {
-                        targetDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
-                    } else if (DataManager.FOLDER_SAFETUBE_MUSIC.equalsIgnoreCase(targetFolderKey)) {
-                        targetDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "SafeTube");
-                    } else if (DataManager.FOLDER_SAFETUBE_VIDEOS.equalsIgnoreCase(targetFolderKey)) {
-                        targetDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "SafeTube");
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        ContentValues values = new ContentValues();
+                        values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
+                        values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType != null ? mimeType : (isAudio ? "audio/mpeg" : "video/mp4"));
+                        values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+
+                        if (isAudio) {
+                            values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/SafeTube");
+                            itemUri = context.getContentResolver().insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values);
+                        } else {
+                            values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/SafeTube");
+                            itemUri = context.getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
+                        }
+
+                        if (itemUri == null) {
+                            // Fallback to downloads collection
+                            itemUri = context.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                        }
+
+                        if (itemUri != null) {
+                            out = context.getContentResolver().openOutputStream(itemUri);
+                        }
                     } else {
-                        targetDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                        // Android 9 and below
+                        File targetDir;
+                        if (isAudio) {
+                            targetDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC);
+                        } else {
+                            targetDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
+                        }
+                        if (!targetDir.exists()) targetDir.mkdirs();
+                        File targetFile = new File(targetDir, fileName);
+                        out = new FileOutputStream(targetFile);
                     }
 
-                    if (!targetDir.exists()) {
-                        targetDir.mkdirs();
+                    if (out == null) {
+                        throw new Exception("שגיאה בפתיחת קובץ יעד");
                     }
-
-                    File targetFile = new File(targetDir, fileName);
 
                     URL url = new URL(downloadUrl);
                     conn = (HttpURLConnection) url.openConnection();
                     conn.setRequestProperty("User-Agent", USER_AGENT);
                     conn.setRequestProperty("Referer", "https://www.youtube.com/");
                     conn.setConnectTimeout(15000);
-                    conn.setReadTimeout(20000);
+                    conn.setReadTimeout(25000);
                     conn.setInstanceFollowRedirects(true);
 
                     int respCode = conn.getResponseCode();
@@ -602,8 +706,6 @@ public class DownloadHelper {
                     }
 
                     in = conn.getInputStream();
-                    out = new FileOutputStream(targetFile);
-
                     byte[] buffer = new byte[16384];
                     int bytesRead;
                     while ((bytesRead = in.read(buffer)) != -1) {
@@ -611,10 +713,16 @@ public class DownloadHelper {
                     }
                     out.flush();
 
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && itemUri != null) {
+                        ContentValues updateVals = new ContentValues();
+                        updateVals.put(MediaStore.MediaColumns.IS_PENDING, 0);
+                        context.getContentResolver().update(itemUri, updateVals, null, null);
+                    }
+
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            Toast.makeText(context, "הקובץ ירד בהצלחה ונשמר!", Toast.LENGTH_LONG).show();
+                            Toast.makeText(context, "הקובץ ירד בהצלחה ונשמר במכשיר!", Toast.LENGTH_LONG).show();
                         }
                     });
 
