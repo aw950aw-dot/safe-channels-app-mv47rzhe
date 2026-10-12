@@ -69,7 +69,24 @@
             android:textSize="14sp" />
     </LinearLayout>
 
-    <!-- Filter Chips Horizontal Scroll -->
+    <!-- Content Type Selector (Regular vs Shorts) -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/llTypeChips"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingBottom="4dp" />
+    </HorizontalScrollView>
+
+    <!-- Filter Channels Horizontal Scroll -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

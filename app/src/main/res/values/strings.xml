@@ -6,6 +6,9 @@
     <string name="search_videos_hint">חפש בסרטונים מאושרים...</string>
     <string name="search_channels_hint">סינון מהיר ברשימת הערוצים...</string>
     <string name="all_channels">כל הערוצים</string>
+    <string name="type_all">הכל</string>
+    <string name="type_regular">סרטונים רגילים</string>
+    <string name="type_shorts">Shorts</string>
     <string name="no_approved_channels">אין ערוצים מאושרים כרגע.\nכנס להגדרות כדי לאשר או להוסיף ערוצים.</string>
     <string name="no_videos">לא נמצאו סרטונים תואמים</string>
     <string name="btn_confirm">אישור</string>
@@ -14,6 +17,12 @@
     <string name="btn_add_custom">חיפוש והוספת ערוץ חדש</string>
     <string name="btn_add_channel">הוסף ערוץ</string>
     <string name="btn_search">חפש ערוץ</string>
+    <string name="btn_download_video">הורדת וידאו</string>
+    <string name="btn_download_audio">הורדת שמע (MP3)</string>
+    <string name="btn_watch_quality">איכות צפייה</string>
+    <string name="btn_switch_server">החלף נגן</string>
+    <string name="select_download_quality">בחר איכות קובץ להורדה:</string>
+    <string name="select_watch_quality">בחר איכות צפייה:</string>
     <string name="incorrect_password">סיסמה שגויה!</string>
     <string name="password_prompt">הכנס סיסמת מנהל (ברירת מחדל: 1234):</string>
     <string name="password_hint">סיסמה</string>

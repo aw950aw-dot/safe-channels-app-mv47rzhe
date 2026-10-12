@@ -28,6 +28,7 @@ public class MainActivity extends Activity {
     private TextView tvEmptyState;
     private EditText etSearchVideos;
     private LinearLayout llChannelChips;
+    private LinearLayout llTypeChips;
     private ImageButton btnSettings;
     private ImageButton btnRefresh;
 
@@ -37,6 +38,7 @@ public class MainActivity extends Activity {
     private List<VideoModel> masterVideoList = new ArrayList<>();
     private List<VideoModel> filteredVideoList = new ArrayList<>();
     private String selectedChannelIdFilter = "ALL";
+    private String selectedTypeFilter = "ALL"; // ALL, REGULAR, SHORTS
     private String currentQuery = "";
 
     @Override
@@ -53,6 +55,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        setupTypeChips();
         setupChannelChips();
         loadApprovedVideos();
     }
@@ -63,6 +66,7 @@ public class MainActivity extends Activity {
         tvEmptyState = findViewById(R.id.tvEmptyState);
         etSearchVideos = findViewById(R.id.etSearchVideos);
         llChannelChips = findViewById(R.id.llChannelChips);
+        llTypeChips = findViewById(R.id.llTypeChips);
         btnSettings = findViewById(R.id.btnSettings);
         btnRefresh = findViewById(R.id.btnRefresh);
 
@@ -114,12 +118,51 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void setupTypeChips() {
+        llTypeChips.removeAllViews();
+        addTypeChip(getString(R.string.type_all), "ALL", selectedTypeFilter.equals("ALL"));
+        addTypeChip(getString(R.string.type_regular), "REGULAR", selectedTypeFilter.equals("REGULAR"));
+        addTypeChip(getString(R.string.type_shorts), "SHORTS", selectedTypeFilter.equals("SHORTS"));
+    }
+
+    private void addTypeChip(final String label, final String typeKey, boolean isSelected) {
+        TextView chip = new TextView(this);
+        chip.setText(label);
+        chip.setTextSize(13);
+        chip.setPadding(28, 14, 28, 14);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.setMarginEnd(12);
+        chip.setLayoutParams(params);
+
+        if (isSelected) {
+            chip.setBackgroundResource(R.drawable.bg_chip_active);
+            chip.setTextColor(0xFFFFFFFF);
+        } else {
+            chip.setBackgroundResource(R.drawable.bg_chip_inactive);
+            chip.setTextColor(0xFF475569);
+        }
+
+        chip.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                selectedTypeFilter = typeKey;
+                setupTypeChips();
+                filterVideos();
+            }
+        });
+
+        llTypeChips.addView(chip);
+    }
+
     private void setupChannelChips() {
         llChannelChips.removeAllViews();
 
         List<ChannelModel> approvedChannels = dataManager.getApprovedChannels();
 
-        // Add "All Channels" Chip
         addChip(getString(R.string.all_channels), "ALL", selectedChannelIdFilter.equals("ALL"));
 
         for (ChannelModel ch : approvedChannels) {
@@ -196,11 +239,19 @@ public class MainActivity extends Activity {
 
         for (VideoModel video : masterVideoList) {
             boolean matchesChannel = selectedChannelIdFilter.equals("ALL") || video.getChannelId().equals(selectedChannelIdFilter);
+            
+            boolean matchesType = true;
+            if (selectedTypeFilter.equals("REGULAR")) {
+                matchesType = !video.isShort();
+            } else if (selectedTypeFilter.equals("SHORTS")) {
+                matchesType = video.isShort();
+            }
+
             boolean matchesQuery = currentQuery.isEmpty() ||
                     video.getTitle().toLowerCase().contains(currentQuery) ||
                     video.getChannelTitle().toLowerCase().contains(currentQuery);
 
-            if (matchesChannel && matchesQuery) {
+            if (matchesChannel && matchesType && matchesQuery) {
                 filteredVideoList.add(video);
             }
         }

@@ -52,6 +52,8 @@ public class VideoAdapter extends BaseAdapter {
             holder.tvTitle = convertView.findViewById(R.id.tvVideoTitle);
             holder.tvChannel = convertView.findViewById(R.id.tvChannelTitle);
             holder.tvDate = convertView.findViewById(R.id.tvPublishDate);
+            holder.tvDurationBadge = convertView.findViewById(R.id.tvDurationBadge);
+            holder.tvShortsBadge = convertView.findViewById(R.id.tvShortsBadge);
             convertView.setTag(holder);
         } else {
             holder = (ViewHolder) convertView.getTag();
@@ -61,6 +63,18 @@ public class VideoAdapter extends BaseAdapter {
         holder.tvTitle.setText(video.getTitle());
         holder.tvChannel.setText(video.getChannelTitle());
         holder.tvDate.setText(video.getPublishedDate());
+
+        if (video.isShort()) {
+            holder.tvShortsBadge.setVisibility(View.VISIBLE);
+            holder.tvDurationBadge.setVisibility(View.GONE);
+        } else if (!video.getFormattedDuration().isEmpty()) {
+            holder.tvDurationBadge.setText(video.getFormattedDuration());
+            holder.tvDurationBadge.setVisibility(View.VISIBLE);
+            holder.tvShortsBadge.setVisibility(View.GONE);
+        } else {
+            holder.tvDurationBadge.setVisibility(View.GONE);
+            holder.tvShortsBadge.setVisibility(View.GONE);
+        }
 
         ImageLoader.getInstance().displayImage(video.getThumbnailUrl(), holder.ivThumbnail);
 
@@ -72,5 +86,7 @@ public class VideoAdapter extends BaseAdapter {
         TextView tvTitle;
         TextView tvChannel;
         TextView tvDate;
+        TextView tvDurationBadge;
+        TextView tvShortsBadge;
     }
 }
