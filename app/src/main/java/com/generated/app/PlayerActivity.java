@@ -107,7 +107,7 @@ public class PlayerActivity extends Activity {
             ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         }
 
-        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36");
+        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36");
 
         webViewPlayer.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -276,13 +276,19 @@ public class PlayerActivity extends Activity {
 
     private void startDirectInAppDownload(final String qualityKey, final boolean isAudioOnly) {
         pbDownloadLoading.setVisibility(View.VISIBLE);
-        Toast.makeText(this, isAudioOnly ? "מחלץ שמע להורדה ישירה..." : "מחלץ סרטון להורדה ישירה...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, isAudioOnly ? "מחלץ קישור להורדת שיר..." : "מחלץ קישור להורדת סרטון...", Toast.LENGTH_SHORT).show();
 
         DownloadHelper.getStreamUrl(currentVideoId, qualityKey, isAudioOnly, new DownloadHelper.StreamCallback() {
             @Override
             public void onSuccess(String streamUrl, String extension, String mimeType) {
                 pbDownloadLoading.setVisibility(View.GONE);
                 DownloadHelper.startDownload(PlayerActivity.this, currentVideoTitle, streamUrl, extension, mimeType, isAudioOnly);
+
+                new AlertDialog.Builder(PlayerActivity.this)
+                        .setTitle(R.string.download_started_title)
+                        .setMessage(R.string.download_started_message)
+                        .setPositiveButton(R.string.btn_confirm, null)
+                        .show();
             }
 
             @Override
@@ -303,10 +309,10 @@ public class PlayerActivity extends Activity {
                         openWebDownloader(isAudioOnly);
                     }
                 })
-                .setNeutralButton(R.string.btn_retry, new DialogInterface.OnClickListener() {
+                .setNeutralButton(R.string.btn_open_cobalt, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        startDirectInAppDownload(isAudioOnly ? "128k" : "720p", isAudioOnly);
+                        openCobaltDownloader();
                     }
                 })
                 .setNegativeButton(R.string.btn_cancel, null)
@@ -323,10 +329,18 @@ public class PlayerActivity extends Activity {
             }
             Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(targetWebUrl));
             startActivity(browserIntent);
-            Toast.makeText(this, "נפתח מקור הורדה מהיר בדפדפן", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "נפתח מקור הורדה ישיר בדפדפן", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Toast.makeText(this, "לא ניתן לפתוח דפדפן במכשיר", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void openCobaltDownloader() {
+        try {
+            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://cobalt.tools"));
+            startActivity(browserIntent);
+            Toast.makeText(this, "נפתח אתר ההורדה Cobalt", Toast.LENGTH_SHORT).show();
+        } catch (Exception ignored) {}
     }
 
     private void startBackgroundPlayback() {
