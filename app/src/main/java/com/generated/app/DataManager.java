@@ -15,6 +15,16 @@ public class DataManager {
     private static final String KEY_DELETED_CHANNELS = "deleted_channels_set";
     private static final String KEY_CUSTOM_CHANNELS = "custom_channels_str";
 
+    // New keys for customizable download storage locations
+    private static final String KEY_VIDEO_FOLDER = "pref_download_video_folder";
+    private static final String KEY_AUDIO_FOLDER = "pref_download_audio_folder";
+
+    public static final String FOLDER_DEFAULT_DOWNLOADS = "Downloads";
+    public static final String FOLDER_DEFAULT_MOVIES = "Movies";
+    public static final String FOLDER_DEFAULT_MUSIC = "Music";
+    public static final String FOLDER_SAFETUBE_VIDEOS = "SafeTube_Videos";
+    public static final String FOLDER_SAFETUBE_MUSIC = "SafeTube_Music";
+
     private static DataManager instance;
     private SharedPreferences prefs;
     private List<ChannelModel> allChannelsList;
@@ -202,5 +212,22 @@ public class DataManager {
             }
             prefs.edit().putString(KEY_CUSTOM_CHANNELS, sb.toString()).apply();
         }
+    }
+
+    // Storage Location Accessors
+    public String getVideoDownloadFolder() {
+        return prefs.getString(KEY_VIDEO_FOLDER, FOLDER_DEFAULT_DOWNLOADS);
+    }
+
+    public void setVideoDownloadFolder(String folderName) {
+        prefs.edit().putString(KEY_VIDEO_FOLDER, folderName).apply();
+    }
+
+    public String getAudioDownloadFolder() {
+        return prefs.getString(KEY_AUDIO_FOLDER, FOLDER_DEFAULT_MUSIC);
+    }
+
+    public void setAudioDownloadFolder(String folderName) {
+        prefs.edit().putString(KEY_AUDIO_FOLDER, folderName).apply();
     }
 }

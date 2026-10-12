@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.webkit.WebChromeClient;
@@ -32,12 +33,14 @@ public class PlayerActivity extends Activity {
 
     private Button btnDownloadVideo;
     private Button btnDownloadAudio;
+    private Button btnBackgroundListen;
     private ImageButton btnExternalOpen;
     private ProgressBar pbDownloadLoading;
     private ProgressBar pbPlayerLoading;
 
     private String currentVideoId = "";
     private String currentVideoTitle = "";
+    private String currentChannelTitle = "";
 
     private View customView;
     private WebChromeClient.CustomViewCallback customViewCallback;
@@ -54,12 +57,12 @@ public class PlayerActivity extends Activity {
         if (intent != null) {
             currentVideoId = intent.getStringExtra("VIDEO_ID");
             currentVideoTitle = intent.getStringExtra("VIDEO_TITLE");
-            String channel = intent.getStringExtra("CHANNEL_TITLE");
+            currentChannelTitle = intent.getStringExtra("CHANNEL_TITLE");
             String date = intent.getStringExtra("PUBLISHED_DATE");
             String description = intent.getStringExtra("DESCRIPTION");
 
             tvPlayerTitle.setText(currentVideoTitle != null ? currentVideoTitle : "");
-            tvPlayerChannel.setText(channel != null ? channel : "");
+            tvPlayerChannel.setText(currentChannelTitle != null ? currentChannelTitle : "");
             tvPlayerDate.setText(date != null && !date.isEmpty() ? "פורסם ב: " + date : "");
             tvPlayerDescription.setText(description != null && !description.isEmpty() ? description : "אין תיאור נוסף עבור סרטון זה.");
 
@@ -82,6 +85,7 @@ public class PlayerActivity extends Activity {
 
         btnDownloadVideo = findViewById(R.id.btnDownloadVideo);
         btnDownloadAudio = findViewById(R.id.btnDownloadAudio);
+        btnBackgroundListen = findViewById(R.id.btnBackgroundListen);
         btnExternalOpen = findViewById(R.id.btnExternalOpen);
         pbDownloadLoading = findViewById(R.id.pbDownloadLoading);
         pbPlayerLoading = findViewById(R.id.pbPlayerLoading);
@@ -99,11 +103,11 @@ public class PlayerActivity extends Activity {
         ws.setLoadWithOverviewMode(true);
         ws.setJavaScriptCanOpenWindowsAutomatically(true);
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         }
 
-        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36");
+        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36");
 
         webViewPlayer.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -183,6 +187,13 @@ public class PlayerActivity extends Activity {
             @Override
             public void onClick(View v) {
                 showDownloadAudioQualityDialog();
+            }
+        });
+
+        btnBackgroundListen.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startBackgroundPlayback();
             }
         });
     }
@@ -268,6 +279,42 @@ public class PlayerActivity extends Activity {
             public void onError(String error) {
                 pbDownloadLoading.setVisibility(View.GONE);
                 Toast.makeText(PlayerActivity.this, R.string.download_error, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void startBackgroundPlayback() {
+        pbDownloadLoading.setVisibility(View.VISIBLE);
+        Toast.makeText(this, R.string.bg_audio_loading, Toast.LENGTH_SHORT).show();
+
+        // Pause webview video so they don't play simultaneously
+        if (webViewPlayer != null) {
+            webViewPlayer.loadUrl("javascript:(function(){var v=document.querySelector('video');if(v){v.pause();}})()");
+        }
+
+        DownloadHelper.getStreamUrl(currentVideoId, "128k", true, new DownloadHelper.StreamCallback() {
+            @Override
+            public void onSuccess(String streamUrl, String extension, String mimeType) {
+                pbDownloadLoading.setVisibility(View.GONE);
+
+                Intent serviceIntent = new Intent(PlayerActivity.this, BackgroundAudioService.class);
+                serviceIntent.setAction(BackgroundAudioService.ACTION_START);
+                serviceIntent.putExtra(BackgroundAudioService.EXTRA_URL, streamUrl);
+                serviceIntent.putExtra(BackgroundAudioService.EXTRA_TITLE, currentVideoTitle);
+                serviceIntent.putExtra(BackgroundAudioService.EXTRA_CHANNEL, currentChannelTitle);
+                serviceIntent.putExtra(BackgroundAudioService.EXTRA_VIDEO_ID, currentVideoId);
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(serviceIntent);
+                } else {
+                    startService(serviceIntent);
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                pbDownloadLoading.setVisibility(View.GONE);
+                Toast.makeText(PlayerActivity.this, R.string.bg_audio_error, Toast.LENGTH_LONG).show();
             }
         });
     }

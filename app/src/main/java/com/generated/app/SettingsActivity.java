@@ -33,6 +33,12 @@ public class SettingsActivity extends Activity {
     private LinearLayout llCategoryChips;
     private ListView lvSettingsChannels;
 
+    // Folder selection UI
+    private LinearLayout llVideoFolderOption;
+    private LinearLayout llAudioFolderOption;
+    private TextView tvVideoFolderValue;
+    private TextView tvAudioFolderValue;
+
     private DataManager dataManager;
     private ChannelAdapter channelAdapter;
 
@@ -50,6 +56,7 @@ public class SettingsActivity extends Activity {
 
         initViews();
         setupListeners();
+        updateFolderLabels();
         loadChannelsData();
     }
 
@@ -60,6 +67,11 @@ public class SettingsActivity extends Activity {
         btnAddCustomChannel = findViewById(R.id.btnAddCustomChannel);
         llCategoryChips = findViewById(R.id.llCategoryChips);
         lvSettingsChannels = findViewById(R.id.lvSettingsChannels);
+
+        llVideoFolderOption = findViewById(R.id.llVideoFolderOption);
+        llAudioFolderOption = findViewById(R.id.llAudioFolderOption);
+        tvVideoFolderValue = findViewById(R.id.tvVideoFolderValue);
+        tvAudioFolderValue = findViewById(R.id.tvAudioFolderValue);
 
         channelAdapter = new ChannelAdapter(this, filteredChannels, new ChannelAdapter.OnChannelActionListener() {
             @Override
@@ -73,6 +85,26 @@ public class SettingsActivity extends Activity {
             }
         });
         lvSettingsChannels.setAdapter(channelAdapter);
+    }
+
+    private void updateFolderLabels() {
+        tvVideoFolderValue.setText(getDisplayFolderName(dataManager.getVideoDownloadFolder()));
+        tvAudioFolderValue.setText(getDisplayFolderName(dataManager.getAudioDownloadFolder()));
+    }
+
+    private String getDisplayFolderName(String key) {
+        if (DataManager.FOLDER_DEFAULT_DOWNLOADS.equalsIgnoreCase(key)) {
+            return getString(R.string.folder_opt_downloads);
+        } else if (DataManager.FOLDER_DEFAULT_MOVIES.equalsIgnoreCase(key)) {
+            return getString(R.string.folder_opt_movies);
+        } else if (DataManager.FOLDER_DEFAULT_MUSIC.equalsIgnoreCase(key)) {
+            return getString(R.string.folder_opt_music);
+        } else if (DataManager.FOLDER_SAFETUBE_VIDEOS.equalsIgnoreCase(key)) {
+            return getString(R.string.folder_opt_safetube_videos);
+        } else if (DataManager.FOLDER_SAFETUBE_MUSIC.equalsIgnoreCase(key)) {
+            return getString(R.string.folder_opt_safetube_music);
+        }
+        return key;
     }
 
     private void setupListeners() {
@@ -97,6 +129,20 @@ public class SettingsActivity extends Activity {
             }
         });
 
+        llVideoFolderOption.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showVideoFolderDialog();
+            }
+        });
+
+        llAudioFolderOption.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showAudioFolderDialog();
+            }
+        });
+
         etSearchChannels.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -110,6 +156,56 @@ public class SettingsActivity extends Activity {
             @Override
             public void afterTextChanged(Editable s) {}
         });
+    }
+
+    private void showVideoFolderDialog() {
+        final String[] options = new String[]{
+                getString(R.string.folder_opt_downloads),
+                getString(R.string.folder_opt_movies),
+                getString(R.string.folder_opt_safetube_videos)
+        };
+        final String[] folderKeys = new String[]{
+                DataManager.FOLDER_DEFAULT_DOWNLOADS,
+                DataManager.FOLDER_DEFAULT_MOVIES,
+                DataManager.FOLDER_SAFETUBE_VIDEOS
+        };
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.choose_video_folder_title)
+                .setItems(options, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dataManager.setVideoDownloadFolder(folderKeys[which]);
+                        updateFolderLabels();
+                        Toast.makeText(SettingsActivity.this, "מיקום הורדת סרטונים עודכן בהצלחה", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .show();
+    }
+
+    private void showAudioFolderDialog() {
+        final String[] options = new String[]{
+                getString(R.string.folder_opt_music),
+                getString(R.string.folder_opt_downloads),
+                getString(R.string.folder_opt_safetube_music)
+        };
+        final String[] folderKeys = new String[]{
+                DataManager.FOLDER_DEFAULT_MUSIC,
+                DataManager.FOLDER_DEFAULT_DOWNLOADS,
+                DataManager.FOLDER_SAFETUBE_MUSIC
+        };
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.choose_audio_folder_title)
+                .setItems(options, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dataManager.setAudioDownloadFolder(folderKeys[which]);
+                        updateFolderLabels();
+                        Toast.makeText(SettingsActivity.this, "מיקום הורדת שירים עודכן בהצלחה", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .show();
     }
 
     private void loadChannelsData() {
