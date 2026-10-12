@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -25,6 +28,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SettingsActivity extends Activity {
+
+    private static final int REQUEST_PICK_VIDEO_FOLDER = 101;
+    private static final int REQUEST_PICK_AUDIO_FOLDER = 102;
 
     private ImageButton btnBack;
     private Button btnChangePass;
@@ -88,8 +94,19 @@ public class SettingsActivity extends Activity {
     }
 
     private void updateFolderLabels() {
-        tvVideoFolderValue.setText(getDisplayFolderName(dataManager.getVideoDownloadFolder()));
-        tvAudioFolderValue.setText(getDisplayFolderName(dataManager.getAudioDownloadFolder()));
+        String videoFolderKey = dataManager.getVideoDownloadFolder();
+        if (DataManager.FOLDER_CUSTOM_TREE.equals(videoFolderKey) && dataManager.getVideoTreeName() != null) {
+            tvVideoFolderValue.setText("מותאמת: " + dataManager.getVideoTreeName());
+        } else {
+            tvVideoFolderValue.setText(getDisplayFolderName(videoFolderKey));
+        }
+
+        String audioFolderKey = dataManager.getAudioDownloadFolder();
+        if (DataManager.FOLDER_CUSTOM_TREE.equals(audioFolderKey) && dataManager.getAudioTreeName() != null) {
+            tvAudioFolderValue.setText("מותאמת: " + dataManager.getAudioTreeName());
+        } else {
+            tvAudioFolderValue.setText(getDisplayFolderName(audioFolderKey));
+        }
     }
 
     private String getDisplayFolderName(String key) {
@@ -104,7 +121,7 @@ public class SettingsActivity extends Activity {
         } else if (DataManager.FOLDER_SAFETUBE_MUSIC.equalsIgnoreCase(key)) {
             return getString(R.string.folder_opt_safetube_music);
         }
-        return key;
+        return key != null ? key : getString(R.string.folder_opt_downloads);
     }
 
     private void setupListeners() {
@@ -160,14 +177,10 @@ public class SettingsActivity extends Activity {
 
     private void showVideoFolderDialog() {
         final String[] options = new String[]{
+                getString(R.string.folder_opt_custom_picker),
                 getString(R.string.folder_opt_downloads),
                 getString(R.string.folder_opt_movies),
                 getString(R.string.folder_opt_safetube_videos)
-        };
-        final String[] folderKeys = new String[]{
-                DataManager.FOLDER_DEFAULT_DOWNLOADS,
-                DataManager.FOLDER_DEFAULT_MOVIES,
-                DataManager.FOLDER_SAFETUBE_VIDEOS
         };
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -175,9 +188,21 @@ public class SettingsActivity extends Activity {
                 .setItems(options, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        dataManager.setVideoDownloadFolder(folderKeys[which]);
-                        updateFolderLabels();
-                        Toast.makeText(SettingsActivity.this, "מיקום הורדת סרטונים עודכן בהצלחה", Toast.LENGTH_SHORT).show();
+                        if (which == 0) {
+                            openCustomFolderPicker(REQUEST_PICK_VIDEO_FOLDER);
+                        } else if (which == 1) {
+                            dataManager.setVideoDownloadFolder(DataManager.FOLDER_DEFAULT_DOWNLOADS);
+                            updateFolderLabels();
+                            Toast.makeText(SettingsActivity.this, "מיקום הורדת סרטונים עודכן", Toast.LENGTH_SHORT).show();
+                        } else if (which == 2) {
+                            dataManager.setVideoDownloadFolder(DataManager.FOLDER_DEFAULT_MOVIES);
+                            updateFolderLabels();
+                            Toast.makeText(SettingsActivity.this, "מיקום הורדת סרטונים עודכן", Toast.LENGTH_SHORT).show();
+                        } else if (which == 3) {
+                            dataManager.setVideoDownloadFolder(DataManager.FOLDER_SAFETUBE_VIDEOS);
+                            updateFolderLabels();
+                            Toast.makeText(SettingsActivity.this, "מיקום הורדת סרטונים עודכן", Toast.LENGTH_SHORT).show();
+                        }
                     }
                 })
                 .show();
@@ -185,14 +210,10 @@ public class SettingsActivity extends Activity {
 
     private void showAudioFolderDialog() {
         final String[] options = new String[]{
+                getString(R.string.folder_opt_custom_picker),
                 getString(R.string.folder_opt_music),
                 getString(R.string.folder_opt_downloads),
                 getString(R.string.folder_opt_safetube_music)
-        };
-        final String[] folderKeys = new String[]{
-                DataManager.FOLDER_DEFAULT_MUSIC,
-                DataManager.FOLDER_DEFAULT_DOWNLOADS,
-                DataManager.FOLDER_SAFETUBE_MUSIC
         };
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -200,12 +221,86 @@ public class SettingsActivity extends Activity {
                 .setItems(options, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        dataManager.setAudioDownloadFolder(folderKeys[which]);
-                        updateFolderLabels();
-                        Toast.makeText(SettingsActivity.this, "מיקום הורדת שירים עודכן בהצלחה", Toast.LENGTH_SHORT).show();
+                        if (which == 0) {
+                            openCustomFolderPicker(REQUEST_PICK_AUDIO_FOLDER);
+                        } else if (which == 1) {
+                            dataManager.setAudioDownloadFolder(DataManager.FOLDER_DEFAULT_MUSIC);
+                            updateFolderLabels();
+                            Toast.makeText(SettingsActivity.this, "מיקום הורדת שירים עודכן", Toast.LENGTH_SHORT).show();
+                        } else if (which == 2) {
+                            dataManager.setAudioDownloadFolder(DataManager.FOLDER_DEFAULT_DOWNLOADS);
+                            updateFolderLabels();
+                            Toast.makeText(SettingsActivity.this, "מיקום הורדת שירים עודכן", Toast.LENGTH_SHORT).show();
+                        } else if (which == 3) {
+                            dataManager.setAudioDownloadFolder(DataManager.FOLDER_SAFETUBE_MUSIC);
+                            updateFolderLabels();
+                            Toast.makeText(SettingsActivity.this, "מיקום הורדת שירים עודכן", Toast.LENGTH_SHORT).show();
+                        }
                     }
                 })
                 .show();
+    }
+
+    private void openCustomFolderPicker(int requestCode) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                startActivityForResult(intent, requestCode);
+            } catch (Exception e) {
+                Toast.makeText(this, "לא ניתן לפתוח את סייר הקבצים במכשיר זה", Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            Toast.makeText(this, "בחירת תיקייה חופשית נתמכת באנדרואיד 5 ומעלה", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (resultCode == RESULT_OK && data != null) {
+            Uri treeUri = data.getData();
+            if (treeUri != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                    try {
+                        final int takeFlags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                        getContentResolver().takePersistableUriPermission(treeUri, takeFlags);
+                    } catch (Exception ignored) {}
+                }
+
+                String folderDisplayName = extractFolderDisplayName(treeUri);
+
+                if (requestCode == REQUEST_PICK_VIDEO_FOLDER) {
+                    dataManager.setVideoTreeUri(treeUri.toString(), folderDisplayName);
+                    updateFolderLabels();
+                    Toast.makeText(this, "תיקיית סרטונים נבחרה בהצלחה: " + folderDisplayName, Toast.LENGTH_LONG).show();
+                } else if (requestCode == REQUEST_PICK_AUDIO_FOLDER) {
+                    dataManager.setAudioTreeUri(treeUri.toString(), folderDisplayName);
+                    updateFolderLabels();
+                    Toast.makeText(this, "תיקיית שירים נבחרה בהצלחה: " + folderDisplayName, Toast.LENGTH_LONG).show();
+                }
+            }
+        }
+    }
+
+    private String extractFolderDisplayName(Uri uri) {
+        try {
+            String path = uri.getPath();
+            if (path != null) {
+                int colonIdx = path.lastIndexOf(':');
+                if (colonIdx != -1 && colonIdx < path.length() - 1) {
+                    return path.substring(colonIdx + 1);
+                }
+                int slashIdx = path.lastIndexOf('/');
+                if (slashIdx != -1 && slashIdx < path.length() - 1) {
+                    return path.substring(slashIdx + 1);
+                }
+            }
+        } catch (Exception ignored) {}
+        return "תיקייה שנבחרה";
     }
 
     private void loadChannelsData() {

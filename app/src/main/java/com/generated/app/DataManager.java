@@ -2,6 +2,7 @@ package com.generated.app;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.Uri;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -15,15 +16,20 @@ public class DataManager {
     private static final String KEY_DELETED_CHANNELS = "deleted_channels_set";
     private static final String KEY_CUSTOM_CHANNELS = "custom_channels_str";
 
-    // New keys for customizable download storage locations
+    // Storage location keys
     private static final String KEY_VIDEO_FOLDER = "pref_download_video_folder";
     private static final String KEY_AUDIO_FOLDER = "pref_download_audio_folder";
+    private static final String KEY_VIDEO_TREE_URI = "pref_download_video_tree_uri";
+    private static final String KEY_AUDIO_TREE_URI = "pref_download_audio_tree_uri";
+    private static final String KEY_VIDEO_TREE_NAME = "pref_download_video_tree_name";
+    private static final String KEY_AUDIO_TREE_NAME = "pref_download_audio_tree_name";
 
     public static final String FOLDER_DEFAULT_DOWNLOADS = "Downloads";
     public static final String FOLDER_DEFAULT_MOVIES = "Movies";
     public static final String FOLDER_DEFAULT_MUSIC = "Music";
     public static final String FOLDER_SAFETUBE_VIDEOS = "SafeTube_Videos";
     public static final String FOLDER_SAFETUBE_MUSIC = "SafeTube_Music";
+    public static final String FOLDER_CUSTOM_TREE = "CUSTOM_TREE";
 
     private static DataManager instance;
     private SharedPreferences prefs;
@@ -229,5 +235,38 @@ public class DataManager {
 
     public void setAudioDownloadFolder(String folderName) {
         prefs.edit().putString(KEY_AUDIO_FOLDER, folderName).apply();
+    }
+
+    // Custom Document Tree (Any Folder) Support
+    public String getVideoTreeUri() {
+        return prefs.getString(KEY_VIDEO_TREE_URI, null);
+    }
+
+    public void setVideoTreeUri(String uriString, String displayName) {
+        prefs.edit()
+                .putString(KEY_VIDEO_TREE_URI, uriString)
+                .putString(KEY_VIDEO_TREE_NAME, displayName)
+                .putString(KEY_VIDEO_FOLDER, FOLDER_CUSTOM_TREE)
+                .apply();
+    }
+
+    public String getVideoTreeName() {
+        return prefs.getString(KEY_VIDEO_TREE_NAME, null);
+    }
+
+    public String getAudioTreeUri() {
+        return prefs.getString(KEY_AUDIO_TREE_URI, null);
+    }
+
+    public void setAudioTreeUri(String uriString, String displayName) {
+        prefs.edit()
+                .putString(KEY_AUDIO_TREE_URI, uriString)
+                .putString(KEY_AUDIO_TREE_NAME, displayName)
+                .putString(KEY_AUDIO_FOLDER, FOLDER_CUSTOM_TREE)
+                .apply();
+    }
+
+    public String getAudioTreeName() {
+        return prefs.getString(KEY_AUDIO_TREE_NAME, null);
     }
 }

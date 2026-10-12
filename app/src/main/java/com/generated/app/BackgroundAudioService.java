@@ -7,12 +7,17 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.widget.Toast;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class BackgroundAudioService extends Service implements
         MediaPlayer.OnPreparedListener,
@@ -36,6 +41,7 @@ public class BackgroundAudioService extends Service implements
     private String currentTitle = "";
     private String currentChannel = "";
     private String currentVideoId = "";
+    private String currentStreamUrl = "";
     private boolean isPreparing = false;
     private static boolean isServiceRunning = false;
     private static boolean isPlayingMusic = false;
@@ -71,11 +77,12 @@ public class BackgroundAudioService extends Service implements
             currentTitle = intent.getStringExtra(EXTRA_TITLE);
             currentChannel = intent.getStringExtra(EXTRA_CHANNEL);
             currentVideoId = intent.getStringExtra(EXTRA_VIDEO_ID);
+            currentStreamUrl = url;
 
-            if (currentTitle == null) currentTitle = "שיר";
+            if (currentTitle == null || currentTitle.isEmpty()) currentTitle = "שיר";
             if (currentChannel == null) currentChannel = "";
 
-            startForeground(NOTIFICATION_ID, buildNotification(true, "טוען שמע לרקע..."));
+            startForeground(NOTIFICATION_ID, buildNotification(false, "טוען שמע לרקע..."));
             playAudio(url);
 
         } else if (ACTION_TOGGLE.equals(action)) {
@@ -98,7 +105,7 @@ public class BackgroundAudioService extends Service implements
         return START_NOT_STICKY;
     }
 
-    private void playAudio(String streamUrl) {
+    private void playAudio(final String streamUrl) {
         if (streamUrl == null || streamUrl.isEmpty()) {
             Toast.makeText(this, "קישור שמע אינו תקין", Toast.LENGTH_SHORT).show();
             stopSelf();
@@ -113,20 +120,51 @@ public class BackgroundAudioService extends Service implements
 
         try {
             mediaPlayer = new MediaPlayer();
-            mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
-            mediaPlayer.setDataSource(streamUrl);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build());
+            } else {
+                mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+            }
+
             mediaPlayer.setWakeMode(getApplicationContext(), PowerManager.PARTIAL_WAKE_LOCK);
             mediaPlayer.setOnPreparedListener(this);
             mediaPlayer.setOnErrorListener(this);
             mediaPlayer.setOnCompletionListener(this);
+
+            Map<String, String> headers = new HashMap<>();
+            headers.put("User-Agent", DownloadHelper.USER_AGENT);
+            headers.put("Accept", "*/*");
+            headers.put("Referer", "https://www.youtube.com/");
+            headers.put("Origin", "https://www.youtube.com");
+
+            mediaPlayer.setDataSource(getApplicationContext(), Uri.parse(streamUrl), headers);
+
             isPreparing = true;
             mediaPlayer.prepareAsync();
             isServiceRunning = true;
         } catch (Exception e) {
             e.printStackTrace();
             isPreparing = false;
-            Toast.makeText(this, "שגיאה בטעינת האודיו: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            stopSelf();
+            // Try fallback without custom headers
+            try {
+                mediaPlayer = new MediaPlayer();
+                mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+                mediaPlayer.setDataSource(streamUrl);
+                mediaPlayer.setOnPreparedListener(this);
+                mediaPlayer.setOnErrorListener(this);
+                mediaPlayer.setOnCompletionListener(this);
+                isPreparing = true;
+                mediaPlayer.prepareAsync();
+                isServiceRunning = true;
+            } catch (Exception ex2) {
+                ex2.printStackTrace();
+                isPreparing = false;
+                Toast.makeText(this, "שגיאה בטעינת האודיו", Toast.LENGTH_LONG).show();
+                stopSelf();
+            }
         }
     }
 

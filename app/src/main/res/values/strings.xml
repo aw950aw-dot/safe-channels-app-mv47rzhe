@@ -22,12 +22,13 @@
     <string name="btn_download_audio">הורדת שיר</string>
     <string name="btn_background_listen">האזנה ברקע (מסך כבוי)</string>
     <string name="bg_audio_loading">מכין שמע להאזנה ברקע...</string>
-    <string name="bg_audio_error">לא הצלחנו להפעיל האזנה ברקע כרגע</string>
+    <string name="bg_audio_error">לא הצלחנו להפעיל האזנה ברקע כרגע, נסה שוב בעוד מספר רגעים.</string>
     <string name="settings_downloads_header">מיקומי שמירת הורדות:</string>
     <string name="folder_videos_label">תיקיית סרטונים:</string>
     <string name="folder_audio_label">תיקיית שירים:</string>
     <string name="choose_video_folder_title">בחר מיקום להורדת סרטונים:</string>
     <string name="choose_audio_folder_title">בחר מיקום להורדת שירים:</string>
+    <string name="folder_opt_custom_picker">📂 בחר כל תיקייה שתרצה במכשיר...</string>
     <string name="folder_opt_downloads">הורדות כלליות (Downloads)</string>
     <string name="folder_opt_movies">סרטים ווידאו (Movies)</string>
     <string name="folder_opt_music">מוזיקה ושמע (Music)</string>
