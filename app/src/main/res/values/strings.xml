@@ -11,6 +11,7 @@
     <string name="type_shorts">Shorts</string>
     <string name="no_approved_channels">אין ערוצים מאושרים כרגע.\nכנס להגדרות כדי לאשר או להוסיף ערוצים.</string>
     <string name="no_videos">לא נמצאו סרטונים תואמים</string>
+    <string name="loading_videos">מרענן ומביא סרטונים חדשים...</string>
     <string name="btn_confirm">אישור</string>
     <string name="btn_cancel">ביטול</string>
     <string name="btn_change_pass">שינוי סיסמה</string>
@@ -22,6 +23,9 @@
     <string name="btn_watch_quality">איכות צפייה</string>
     <string name="btn_direct_stream">הזרמה ישירה</string>
     <string name="btn_switch_server">החלף שרת נגן</string>
+    <string name="server_official">יוטיוב רשמי</string>
+    <string name="server_invidious">שרת פרטי</string>
+    <string name="server_direct">הזרמה ישירה</string>
     <string name="select_download_quality">בחר איכות קובץ להורדה:</string>
     <string name="select_watch_quality">בחר איכות צפייה:</string>
     <string name="incorrect_password">סיסמה שגויה!</string>

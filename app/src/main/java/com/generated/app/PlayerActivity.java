@@ -27,6 +27,7 @@ public class PlayerActivity extends Activity {
     private TextView tvPlayerChannel;
     private TextView tvPlayerDate;
     private TextView tvPlayerDescription;
+    private TextView tvServerBadge;
     private ImageButton btnPlayerBack;
 
     private Button btnDownloadVideo;
@@ -76,6 +77,7 @@ public class PlayerActivity extends Activity {
         tvPlayerChannel = findViewById(R.id.tvPlayerChannel);
         tvPlayerDate = findViewById(R.id.tvPlayerDate);
         tvPlayerDescription = findViewById(R.id.tvPlayerDescription);
+        tvServerBadge = findViewById(R.id.tvServerBadge);
         btnPlayerBack = findViewById(R.id.btnPlayerBack);
 
         btnDownloadVideo = findViewById(R.id.btnDownloadVideo);
@@ -97,12 +99,19 @@ public class PlayerActivity extends Activity {
         ws.setMediaPlaybackRequiresUserGesture(false);
         ws.setUseWideViewPort(true);
         ws.setLoadWithOverviewMode(true);
-        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36");
+        ws.setJavaScriptCanOpenWindowsAutomatically(true);
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        }
+
+        // Clean Mobile Chrome User Agent without 'wv' embedded tag so YouTube embeds play flawlessly
+        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36");
 
         webViewPlayer.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
-                if (newProgress >= 90) {
+                if (newProgress >= 85) {
                     pbPlayerLoading.setVisibility(View.GONE);
                 }
             }
@@ -121,7 +130,7 @@ public class PlayerActivity extends Activity {
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                // If standard fails, offer or switch fallback
+                // If official embed fails, suggest fallback
             }
         });
     }
@@ -178,9 +187,9 @@ public class PlayerActivity extends Activity {
         pbPlayerLoading.setVisibility(View.VISIBLE);
 
         if (playerMode == 0) {
-            // Mode 0: Clean YouTube Embed with HTML5 container
-            String embedUrl = "https://www.youtube-nocookie.com/embed/" + currentVideoId +
-                    "?autoplay=1&playsinline=1&enablejsapi=1&rel=0&modestbranding=1&fs=1";
+            tvServerBadge.setText(R.string.server_official);
+            String embedUrl = "https://www.youtube.com/embed/" + currentVideoId +
+                    "?autoplay=1&playsinline=1&enablejsapi=1&origin=https://www.youtube.com&rel=0&modestbranding=1&fs=1";
 
             String html = "<!DOCTYPE html><html><head>" +
                     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">" +
@@ -197,8 +206,8 @@ public class PlayerActivity extends Activity {
             webViewPlayer.loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "UTF-8", null);
 
         } else if (playerMode == 1) {
-            // Mode 1: Invidious Embed
-            String embedUrl = "https://inv.nadeko.net/embed/" + currentVideoId + "?autoplay=1";
+            tvServerBadge.setText(R.string.server_invidious);
+            String embedUrl = "https://invidious.privacyredirect.com/embed/" + currentVideoId + "?autoplay=1";
             String html = "<!DOCTYPE html><html><head>" +
                     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">" +
                     "<style>" +
@@ -209,7 +218,7 @@ public class PlayerActivity extends Activity {
                     "<iframe src=\"" + embedUrl + "\" allowfullscreen></iframe>" +
                     "</body></html>";
 
-            webViewPlayer.loadDataWithBaseURL("https://inv.nadeko.net", html, "text/html", "UTF-8", null);
+            webViewPlayer.loadDataWithBaseURL("https://invidious.privacyredirect.com", html, "text/html", "UTF-8", null);
         }
     }
 
@@ -222,6 +231,7 @@ public class PlayerActivity extends Activity {
             public void onSuccess(final String streamUrl, String extension, String mimeType) {
                 pbPlayerLoading.setVisibility(View.GONE);
                 playerMode = 2;
+                tvServerBadge.setText(R.string.server_direct);
 
                 String html = "<!DOCTYPE html><html><head>" +
                         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">" +
@@ -240,14 +250,15 @@ public class PlayerActivity extends Activity {
             @Override
             public void onError(String error) {
                 pbPlayerLoading.setVisibility(View.GONE);
-                Toast.makeText(PlayerActivity.this, "לא הצלחנו לחלץ קישור ישיר, נסה להחליף נגן.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(PlayerActivity.this, "ההזרמה הישירה לא זמינה, נסה להחליף נגן.", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
     private void openInExternalApp() {
         try {
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=1" + currentVideoId));
+            // Correct official YouTube video URL format without extra digit
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + currentVideoId));
             startActivity(intent);
         } catch (Exception e) {
             Toast.makeText(this, "לא נמצאה אפליקציה מתאימה לפתיחה", Toast.LENGTH_SHORT).show();

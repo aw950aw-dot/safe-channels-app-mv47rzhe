@@ -50,6 +50,13 @@ public class MainActivity extends Activity {
 
         initViews();
         setupListeners();
+
+        // Load instantly from cache if available
+        List<VideoModel> cached = RssFetcher.getCachedVideos(this);
+        if (!cached.isEmpty()) {
+            masterVideoList = cached;
+            filterVideos();
+        }
     }
 
     @Override
@@ -85,6 +92,7 @@ public class MainActivity extends Activity {
         btnRefresh.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                Toast.makeText(MainActivity.this, R.string.loading_videos, Toast.LENGTH_SHORT).show();
                 loadApprovedVideos();
             }
         });
@@ -216,10 +224,12 @@ public class MainActivity extends Activity {
             return;
         }
 
-        progressBar.setVisibility(View.VISIBLE);
-        tvEmptyState.setVisibility(View.GONE);
+        if (masterVideoList.isEmpty()) {
+            progressBar.setVisibility(View.VISIBLE);
+            tvEmptyState.setVisibility(View.GONE);
+        }
 
-        RssFetcher.fetchVideosForChannels(approvedChannels, new RssFetcher.FetchCallback() {
+        RssFetcher.fetchVideosForChannels(this, approvedChannels, new RssFetcher.FetchCallback() {
             @Override
             public void onSuccess(List<VideoModel> videos) {
                 progressBar.setVisibility(View.GONE);
@@ -230,7 +240,12 @@ public class MainActivity extends Activity {
             @Override
             public void onError(String error) {
                 progressBar.setVisibility(View.GONE);
-                Toast.makeText(MainActivity.this, error, Toast.LENGTH_SHORT).show();
+                if (masterVideoList.isEmpty()) {
+                    tvEmptyState.setText(error);
+                    tvEmptyState.setVisibility(View.VISIBLE);
+                } else {
+                    Toast.makeText(MainActivity.this, error, Toast.LENGTH_SHORT).show();
+                }
             }
         });
     }

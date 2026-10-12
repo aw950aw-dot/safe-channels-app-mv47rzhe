@@ -1,5 +1,7 @@
 package com.generated.app;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -9,6 +11,7 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
@@ -34,26 +37,74 @@ public class RssFetcher {
         void onError(String error);
     }
 
+    private static final String PREF_CACHE = "SafeTube_Video_Cache";
+    private static final String KEY_CACHED_VIDEOS = "cached_videos_json";
+
     private static final ExecutorService executor = Executors.newFixedThreadPool(6);
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    private static final String BROWSER_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36";
+    private static final String CONSENT_COOKIE = "SOCS=CAESEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiAo_CLBg; CONSENT=YES+cb.20210328-17-p0.en+FX+478;";
+    private static final String FEED_USER_AGENT = "FeedFetcher-Google; (+http://www.google.com/feedfetcher.html)";
+    private static final String BROWSER_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 
     private static final String[] INVIDIOUS_INSTANCES = new String[]{
-            "https://inv.nadeko.net",
-            "https://invidious.jing.rocks",
-            "https://yt.artemislena.eu",
             "https://invidious.privacyredirect.com",
-            "https://iv.melmac.space"
+            "https://iv.melmac.space",
+            "https://invidious.nerdvpn.de",
+            "https://yewtu.be",
+            "https://invidious.no-val.org",
+            "https://inv.nadeko.net",
+            "https://invidious.jing.rocks"
     };
 
-    private static final String[] PIPED_INSTANCES = new String[]{
-            "https://pipedapi.kavin.rocks",
-            "https://api.piped.privacydev.net",
-            "https://pipedapi.tokhmi.xyz"
-    };
+    public static List<VideoModel> getCachedVideos(Context context) {
+        List<VideoModel> list = new ArrayList<>();
+        try {
+            SharedPreferences prefs = context.getApplicationContext().getSharedPreferences(PREF_CACHE, Context.MODE_PRIVATE);
+            String rawJson = prefs.getString(KEY_CACHED_VIDEOS, "");
+            if (!rawJson.isEmpty()) {
+                JSONArray arr = new JSONArray(rawJson);
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject obj = arr.getJSONObject(i);
+                    list.add(new VideoModel(
+                            obj.getString("id"),
+                            obj.getString("title"),
+                            obj.getString("channelId"),
+                            obj.getString("channelTitle"),
+                            obj.optString("publishedDate", ""),
+                            obj.optString("thumbnailUrl", ""),
+                            obj.optString("description", ""),
+                            obj.optInt("durationSeconds", 0),
+                            obj.optBoolean("isShort", false)
+                    ));
+                }
+            }
+        } catch (Exception ignored) {}
+        return list;
+    }
 
-    public static void fetchVideosForChannels(final List<ChannelModel> channels, final FetchCallback callback) {
+    private static void saveCachedVideos(Context context, List<VideoModel> videos) {
+        try {
+            JSONArray arr = new JSONArray();
+            for (VideoModel v : videos) {
+                JSONObject obj = new JSONObject();
+                obj.put("id", v.getId());
+                obj.put("title", v.getTitle());
+                obj.put("channelId", v.getChannelId());
+                obj.put("channelTitle", v.getChannelTitle());
+                obj.put("publishedDate", v.getPublishedDate());
+                obj.put("thumbnailUrl", v.getThumbnailUrl());
+                obj.put("description", v.getDescription());
+                obj.put("durationSeconds", v.getDurationSeconds());
+                obj.put("isShort", v.isShort());
+                arr.put(obj);
+            }
+            SharedPreferences prefs = context.getApplicationContext().getSharedPreferences(PREF_CACHE, Context.MODE_PRIVATE);
+            prefs.edit().putString(KEY_CACHED_VIDEOS, arr.toString()).apply();
+        } catch (Exception ignored) {}
+    }
+
+    public static void fetchVideosForChannels(final Context context, final List<ChannelModel> channels, final FetchCallback callback) {
         executor.submit(new Runnable() {
             @Override
             public void run() {
@@ -99,7 +150,7 @@ public class RssFetcher {
                 }
 
                 try {
-                    latch.await(14, TimeUnit.SECONDS);
+                    latch.await(12, TimeUnit.SECONDS);
                 } catch (InterruptedException ignored) {}
 
                 List<VideoModel> resultList;
@@ -116,10 +167,16 @@ public class RssFetcher {
                     }
                 });
 
-                if (resultList.isEmpty()) {
-                    postError(callback, "לא הצלחנו להביא סרטונים. בדוק את חיבור האינטרנט ונסה שוב.");
-                } else {
+                if (!resultList.isEmpty()) {
+                    saveCachedVideos(context, resultList);
                     postSuccess(callback, resultList);
+                } else {
+                    List<VideoModel> cached = getCachedVideos(context);
+                    if (!cached.isEmpty()) {
+                        postSuccess(callback, cached);
+                    } else {
+                        postError(callback, "לא הצלחנו להביא סרטונים. אנא בדוק את החיבור לאינטרנט ונסה שוב.");
+                    }
                 }
             }
         });
@@ -144,27 +201,21 @@ public class RssFetcher {
     }
 
     private static List<VideoModel> fetchVideosMultiSource(String channelId, String fallbackChannelName) {
-        List<VideoModel> list = new ArrayList<>();
-
-        // Tier 1: YouTube Official RSS Feed with follow-redirects
-        list = fetchChannelRss(channelId, fallbackChannelName);
+        List<VideoModel> list = fetchChannelRss(channelId, fallbackChannelName);
         if (!list.isEmpty()) {
             return list;
         }
 
-        // Tier 2: Invidious API
+        list = fetchFromInnertube(channelId, fallbackChannelName);
+        if (!list.isEmpty()) {
+            return list;
+        }
+
         list = fetchFromInvidious(channelId, fallbackChannelName);
         if (!list.isEmpty()) {
             return list;
         }
 
-        // Tier 3: Piped API
-        list = fetchFromPiped(channelId, fallbackChannelName);
-        if (!list.isEmpty()) {
-            return list;
-        }
-
-        // Tier 4: Scrape YouTube channel videos page
         list = fetchChannelFromHtml(channelId, fallbackChannelName);
         return list;
     }
@@ -176,8 +227,9 @@ public class RssFetcher {
 
         try {
             String rssUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=" + channelId;
-            conn = openConnectionWithRedirects(rssUrl, 6000);
-            conn.setRequestProperty("User-Agent", BROWSER_USER_AGENT);
+            conn = openConnectionWithRedirects(rssUrl, 5000);
+            conn.setRequestProperty("User-Agent", FEED_USER_AGENT);
+            conn.setRequestProperty("Cookie", CONSENT_COOKIE);
             conn.setRequestProperty("Accept", "application/atom+xml,application/xml,text/xml,*/*");
 
             if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
@@ -192,14 +244,14 @@ public class RssFetcher {
 
                 String xml = sb.toString();
 
-                Pattern pEntry = Pattern.compile("<entry>(.*?)</entry>", Pattern.DOTALL);
+                Pattern pEntry = Pattern.compile("<entry\\b[^>]*>(.*?)</entry>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
                 Matcher mEntry = pEntry.matcher(xml);
 
-                Pattern pVideoId = Pattern.compile("<yt:videoId>(.*?)</yt:videoId>");
-                Pattern pTitle = Pattern.compile("<title>(.*?)</title>");
-                Pattern pAuthor = Pattern.compile("<name>(.*?)</name>");
-                Pattern pPublished = Pattern.compile("<published>(.*?)</published>");
-                Pattern pDesc = Pattern.compile("<media:description>(.*?)</media:description>", Pattern.DOTALL);
+                Pattern pVideoId = Pattern.compile("<yt:videoId>(.*?)</yt:videoId>", Pattern.CASE_INSENSITIVE);
+                Pattern pTitle = Pattern.compile("<title\\b[^>]*>(.*?)</title>", Pattern.CASE_INSENSITIVE);
+                Pattern pAuthor = Pattern.compile("<name\\b[^>]*>(.*?)</name>", Pattern.CASE_INSENSITIVE);
+                Pattern pPublished = Pattern.compile("<published\\b[^>]*>(.*?)</published>", Pattern.CASE_INSENSITIVE);
+                Pattern pDesc = Pattern.compile("<media:description\\b[^>]*>(.*?)</media:description>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
                 while (mEntry.find()) {
                     String block = mEntry.group(1);
@@ -209,7 +261,7 @@ public class RssFetcher {
                     if (mId.find()) {
                         videoId = mId.group(1).trim();
                     } else {
-                        Pattern pAltId = Pattern.compile("<id>yt:video:(.*?)</id>");
+                        Pattern pAltId = Pattern.compile("<id>yt:video:(.*?)</id>", Pattern.CASE_INSENSITIVE);
                         Matcher mAltId = pAltId.matcher(block);
                         if (mAltId.find()) {
                             videoId = mAltId.group(1).trim();
@@ -248,12 +300,108 @@ public class RssFetcher {
                     videos.add(new VideoModel(videoId, title, channelId, channelTitle, published, thumbUrl, desc, 0, isShort));
                 }
             }
-        } catch (Exception e) {
-            // RSS fail, fallback will catch it
+        } catch (Exception ignored) {
         } finally {
             if (is != null) {
                 try { is.close(); } catch (Exception ignored) {}
             }
+            if (conn != null) conn.disconnect();
+        }
+
+        return videos;
+    }
+
+    private static List<VideoModel> fetchFromInnertube(String channelId, String fallbackChannelName) {
+        List<VideoModel> videos = new ArrayList<>();
+        HttpURLConnection conn = null;
+
+        try {
+            URL url = new URL("https://www.youtube.com/youtubei/v1/browse?prettyPrint=false");
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("User-Agent", BROWSER_USER_AGENT);
+            conn.setRequestProperty("X-YouTube-Client-Name", "1");
+            conn.setRequestProperty("X-YouTube-Client-Version", "2.20240401.01.00");
+
+            JSONObject client = new JSONObject();
+            client.put("clientName", "WEB");
+            client.put("clientVersion", "2.20240401.01.00");
+            client.put("hl", "he");
+            client.put("gl", "IL");
+
+            JSONObject context = new JSONObject();
+            context.put("client", client);
+
+            JSONObject payload = new JSONObject();
+            payload.put("context", context);
+            payload.put("browseId", channelId);
+            payload.put("params", "Egl2aWRlb3PyBgQKAjoA");
+
+            OutputStream os = conn.getOutputStream();
+            os.write(payload.toString().getBytes("UTF-8"));
+            os.flush();
+            os.close();
+
+            if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
+                }
+                reader.close();
+
+                String jsonStr = sb.toString();
+
+                Pattern pRenderer = Pattern.compile("\"videoRenderer\"\\s*:\\s*\\{(.+?)(?=\"videoRenderer\"|\"gridVideoRenderer\"|\\}\\s*,\\s*\"shelfRenderer\"|\\}\\s*\\]\\s*\\})", Pattern.DOTALL);
+                Matcher mRenderer = pRenderer.matcher(jsonStr);
+
+                Pattern pId = Pattern.compile("\"videoId\"\\s*:\\s*\"([a-zA-Z0-9_-]{11})\"");
+                Pattern pTitle = Pattern.compile("\"title\"\\s*:\\s*\\{[^}]*\"text\"\\s*:\\s*\"([^\"]+)\"");
+                Pattern pLength = Pattern.compile("\"lengthText\"\\s*:\\s*\\{[^}]*\"simpleText\"\\s*:\\s*\"([^\"]+)\"");
+                Pattern pPub = Pattern.compile("\"publishedTimeText\"\\s*:\\s*\\{[^}]*\"simpleText\"\\s*:\\s*\"([^\"]+)\"");
+
+                Set<String> added = new HashSet<>();
+                while (mRenderer.find() && videos.size() < 30) {
+                    String block = mRenderer.group(1);
+
+                    Matcher mId = pId.matcher(block);
+                    if (!mId.find()) continue;
+                    String videoId = mId.group(1);
+                    if (added.contains(videoId)) continue;
+                    added.add(videoId);
+
+                    String title = "וידאו";
+                    Matcher mT = pTitle.matcher(block);
+                    if (mT.find()) {
+                        title = mT.group(1);
+                    }
+
+                    String durationText = "";
+                    Matcher mL = pLength.matcher(block);
+                    if (mL.find()) {
+                        durationText = mL.group(1);
+                    }
+
+                    String pubDate = "";
+                    Matcher mP = pPub.matcher(block);
+                    if (mP.find()) {
+                        pubDate = mP.group(1);
+                    }
+
+                    int durationSec = parseDurationSeconds(durationText);
+                    boolean isShort = (durationSec > 0 && durationSec <= 60) || title.toLowerCase().contains("#shorts");
+                    String thumbUrl = "https://i.ytimg.com/vi/" + videoId + "/hqdefault.jpg";
+
+                    videos.add(new VideoModel(videoId, unescapeJson(title), channelId, fallbackChannelName, pubDate, thumbUrl, "", durationSec, isShort));
+                }
+            }
+        } catch (Exception ignored) {
+        } finally {
             if (conn != null) conn.disconnect();
         }
 
@@ -267,8 +415,8 @@ public class RssFetcher {
             try {
                 URL url = new URL(instance + "/api/v1/channels/" + channelId + "/videos");
                 conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(4500);
-                conn.setReadTimeout(4500);
+                conn.setConnectTimeout(4000);
+                conn.setReadTimeout(4000);
                 conn.setRequestMethod("GET");
                 conn.setRequestProperty("User-Agent", BROWSER_USER_AGENT);
 
@@ -282,7 +430,7 @@ public class RssFetcher {
                     reader.close();
 
                     JSONArray arr = new JSONArray(sb.toString());
-                    for (int i = 0; i < arr.length() && i < 20; i++) {
+                    for (int i = 0; i < arr.length() && i < 25; i++) {
                         JSONObject obj = arr.getJSONObject(i);
                         String videoId = obj.optString("videoId", "");
                         String title = obj.optString("title", "סרטון");
@@ -315,72 +463,15 @@ public class RssFetcher {
         return videos;
     }
 
-    private static List<VideoModel> fetchFromPiped(String channelId, String fallbackChannelName) {
-        List<VideoModel> videos = new ArrayList<>();
-        for (String instance : PIPED_INSTANCES) {
-            HttpURLConnection conn = null;
-            try {
-                URL url = new URL(instance + "/channel/" + channelId);
-                conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(4500);
-                conn.setReadTimeout(4500);
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("User-Agent", BROWSER_USER_AGENT);
-
-                if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                    StringBuilder sb = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        sb.append(line);
-                    }
-                    reader.close();
-
-                    JSONObject root = new JSONObject(sb.toString());
-                    JSONArray related = root.optJSONArray("relatedStreams");
-                    if (related != null) {
-                        for (int i = 0; i < related.length() && i < 20; i++) {
-                            JSONObject stream = related.getJSONObject(i);
-                            String streamUrl = stream.optString("url", "");
-                            String videoId = "";
-                            if (streamUrl.contains("/watch?v=")) {
-                                videoId = streamUrl.substring(streamUrl.indexOf("/watch?v=") + 9);
-                            } else if (streamUrl.startsWith("/")) {
-                                videoId = streamUrl.replace("/", "");
-                            }
-
-                            if (!videoId.isEmpty()) {
-                                String title = stream.optString("title", "סרטון");
-                                String author = stream.optString("uploaderName", fallbackChannelName);
-                                int duration = stream.optInt("duration", 0);
-                                String uploadedDate = stream.optString("uploadedDate", "");
-                                boolean isShort = stream.optBoolean("isShort", duration > 0 && duration <= 60);
-
-                                String thumbUrl = stream.optString("thumbnail", "https://i.ytimg.com/vi/" + videoId + "/hqdefault.jpg");
-                                videos.add(new VideoModel(videoId, title, channelId, author, uploadedDate, thumbUrl, "", duration, isShort));
-                            }
-                        }
-                    }
-                    if (!videos.isEmpty()) {
-                        break;
-                    }
-                }
-            } catch (Exception ignored) {
-            } finally {
-                if (conn != null) conn.disconnect();
-            }
-        }
-        return videos;
-    }
-
     private static List<VideoModel> fetchChannelFromHtml(String channelId, String fallbackChannelName) {
         List<VideoModel> list = new ArrayList<>();
         HttpURLConnection conn = null;
 
         try {
             String pageUrl = "https://www.youtube.com/channel/" + channelId + "/videos";
-            conn = openConnectionWithRedirects(pageUrl, 6000);
+            conn = openConnectionWithRedirects(pageUrl, 5000);
             conn.setRequestProperty("User-Agent", BROWSER_USER_AGENT);
+            conn.setRequestProperty("Cookie", CONSENT_COOKIE);
             conn.setRequestProperty("Accept-Language", "he,en;q=0.9");
 
             if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
@@ -518,6 +609,14 @@ public class RssFetcher {
                 .replace("&gt;", ">")
                 .replace("&#39;", "'")
                 .replace("&apos;", "'")
+                .replace("\\u0026", "&");
+    }
+
+    private static String unescapeJson(String text) {
+        if (text == null) return "";
+        return text.replace("\\\"", "\"")
+                .replace("\\\\", "\\")
+                .replace("\\/", "/")
                 .replace("\\u0026", "&");
     }
 }
