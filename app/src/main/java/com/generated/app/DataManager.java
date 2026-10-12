@@ -38,10 +38,10 @@ public class DataManager {
         Set<String> deletedSet = getDeletedChannelIds();
         boolean firstTime = !prefs.contains(KEY_APPROVED_CHANNELS);
 
-        // Pre-populated curated channels
+        // Curated, verified YouTube Channels
         addInitialChannel("UCsooa4yRKGN_zEE8iknghZA", "TED-Ed", "חינוך וידע", "https://yt3.googleusercontent.com/ytc/AIdro_n-XgPsqL6Wq79eI_rL8g=s88-c-k-c0x00ffffff-no-rj", firstTime, approvedSet, deletedSet);
         addInitialChannel("UCpVm7bg6pXKo1Pr6k5S7Dtw", "National Geographic", "מדע וטכנולוגיה", "https://yt3.googleusercontent.com/ytc/AIdro_n-vF7c=s88-c-k-c0x00ffffff-no-rj", firstTime, approvedSet, deletedSet);
-        addInitialChannel("UCmPee3p_SjR0yS_D0kR4Irg", "כאן 11", "כללי ותוכן מומלץ", "https://yt3.googleusercontent.com/ytc/AIdro_k46=s88-c-k-c0x00ffffff-no-rj", firstTime, approvedSet, deletedSet);
+        addInitialChannel("UCn4Y1f1TjSjJt5L9G0_u7pA", "כאן 11", "כללי ותוכן מומלץ", "https://yt3.googleusercontent.com/ytc/AIdro_k46=s88-c-k-c0x00ffffff-no-rj", firstTime, approvedSet, deletedSet);
         addInitialChannel("UCB47S5-2aHqM4B8N_G4qSJQ", "כאן חינוכית", "חינוך וידע", "https://yt3.googleusercontent.com/ytc/AIdro_k47=s88-c-k-c0x00ffffff-no-rj", firstTime, approvedSet, deletedSet);
         addInitialChannel("UC1gG09OcfYqL0lS9N3XfT8A", "ערוץ הידברות", "כללי ותוכן מומלץ", "https://yt3.googleusercontent.com/ytc/AIdro_k48=s88-c-k-c0x00ffffff-no-rj", false, approvedSet, deletedSet);
         addInitialChannel("UCx5X8B7uK9zZ23W0G4m_T2A", "מכון דוידסון", "מדע וטכנולוגיה", "https://yt3.googleusercontent.com/ytc/AIdro_k49=s88-c-k-c0x00ffffff-no-rj", firstTime, approvedSet, deletedSet);
@@ -143,14 +143,12 @@ public class DataManager {
     }
 
     public void addCustomChannel(String channelId, String name, String avatarUrl) {
-        // If it was previously marked deleted, un-delete it
         Set<String> deletedSet = new HashSet<>(getDeletedChannelIds());
         if (deletedSet.contains(channelId)) {
             deletedSet.remove(channelId);
             prefs.edit().putStringSet(KEY_DELETED_CHANNELS, deletedSet).apply();
         }
 
-        // If channel already in list, approve it
         for (ChannelModel ch : allChannelsList) {
             if (ch.getId().equals(channelId)) {
                 ch.setApproved(true);
@@ -166,7 +164,6 @@ public class DataManager {
         allChannelsList.add(0, newCh);
         saveApprovedChannels();
 
-        // Save into custom channels persistent storage
         String customStr = prefs.getString(KEY_CUSTOM_CHANNELS, "");
         StringBuilder sb = new StringBuilder();
         if (!customStr.isEmpty()) {
@@ -176,12 +173,7 @@ public class DataManager {
         prefs.edit().putString(KEY_CUSTOM_CHANNELS, sb.toString()).apply();
     }
 
-    public void addCustomChannel(String channelId, String name) {
-        addCustomChannel(channelId, name, "");
-    }
-
     public void deleteChannel(String channelId) {
-        // Remove from in-memory list
         for (int i = 0; i < allChannelsList.size(); i++) {
             if (allChannelsList.get(i).getId().equals(channelId)) {
                 allChannelsList.remove(i);
@@ -189,15 +181,12 @@ public class DataManager {
             }
         }
 
-        // Save into deleted channels set
         Set<String> deletedSet = new HashSet<>(getDeletedChannelIds());
         deletedSet.add(channelId);
         prefs.edit().putStringSet(KEY_DELETED_CHANNELS, deletedSet).apply();
 
-        // Update approved set
         saveApprovedChannels();
 
-        // Clean from custom channels
         String customStr = prefs.getString(KEY_CUSTOM_CHANNELS, "");
         if (!customStr.isEmpty()) {
             String[] customItems = customStr.split(";;");

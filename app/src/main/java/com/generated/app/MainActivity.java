@@ -38,7 +38,7 @@ public class MainActivity extends Activity {
     private List<VideoModel> masterVideoList = new ArrayList<>();
     private List<VideoModel> filteredVideoList = new ArrayList<>();
     private String selectedChannelIdFilter = "ALL";
-    private String selectedTypeFilter = "ALL"; // ALL, REGULAR, SHORTS
+    private String selectedTypeFilter = "ALL";
     private String currentQuery = "";
 
     @Override
@@ -106,6 +106,7 @@ public class MainActivity extends Activity {
         gvVideos.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                if (position < 0 || position >= filteredVideoList.size()) return;
                 VideoModel video = filteredVideoList.get(position);
                 Intent intent = new Intent(MainActivity.this, PlayerActivity.class);
                 intent.putExtra("VIDEO_ID", video.getId());
@@ -239,7 +240,7 @@ public class MainActivity extends Activity {
 
         for (VideoModel video : masterVideoList) {
             boolean matchesChannel = selectedChannelIdFilter.equals("ALL") || video.getChannelId().equals(selectedChannelIdFilter);
-            
+
             boolean matchesType = true;
             if (selectedTypeFilter.equals("REGULAR")) {
                 matchesType = !video.isShort();

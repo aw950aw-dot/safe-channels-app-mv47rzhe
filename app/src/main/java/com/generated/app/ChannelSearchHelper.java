@@ -47,6 +47,7 @@ public class ChannelSearchHelper {
 
     private static final ExecutorService executor = Executors.newFixedThreadPool(2);
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
     public static void searchChannels(final String query, final SearchCallback callback) {
         executor.submit(new Runnable() {
@@ -59,7 +60,6 @@ public class ChannelSearchHelper {
                         return;
                     }
 
-                    // Direct channel ID check
                     if (cleanQuery.startsWith("UC") && cleanQuery.length() >= 20) {
                         List<ChannelSearchResult> singleResult = new ArrayList<>();
                         singleResult.add(new ChannelSearchResult(cleanQuery, "ערוץ " + cleanQuery, "מזהה ערוץ ישיר", ""));
@@ -67,10 +67,8 @@ public class ChannelSearchHelper {
                         return;
                     }
 
-                    // 1. Try scraping YouTube search with channel filter (sp=EgIQAg%3D%3D)
                     List<ChannelSearchResult> results = scrapeYouTubeSearch(cleanQuery);
 
-                    // 2. If scraping returned few or no results, fallback to Invidious search
                     if (results.isEmpty()) {
                         results = searchInvidious(cleanQuery);
                     }
@@ -109,7 +107,6 @@ public class ChannelSearchHelper {
         HttpURLConnection conn = null;
         try {
             String encoded = URLEncoder.encode(query, "UTF-8");
-            // sp=EgIQAg%3D%3D restricts YouTube search to channels only
             String searchUrl = "https://www.youtube.com/results?search_query=" + encoded + "&sp=EgIQAg%3D%3D";
 
             URL url = new URL(searchUrl);
@@ -117,7 +114,7 @@ public class ChannelSearchHelper {
             conn.setRequestMethod("GET");
             conn.setConnectTimeout(6000);
             conn.setReadTimeout(6000);
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            conn.setRequestProperty("User-Agent", USER_AGENT);
             conn.setRequestProperty("Accept-Language", "he,en;q=0.9");
 
             if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
@@ -132,7 +129,6 @@ public class ChannelSearchHelper {
 
                 String html = sb.toString();
 
-                // Pattern to match channelRenderer blocks in initial data
                 Pattern pRenderer = Pattern.compile("\"channelRenderer\"\\s*:\\s*\\{(.+?)(?=\"channelRenderer\"|\"videoRenderer\"|\\}\\s*,\\s*\"shelfRenderer\"|\\}\\s*\\]\\s*\\})", Pattern.DOTALL);
                 Matcher mRenderer = pRenderer.matcher(html);
 
@@ -140,7 +136,6 @@ public class ChannelSearchHelper {
                 Pattern pTitle1 = Pattern.compile("\"title\"\\s*:\\s*\\{[^}]*\"simpleText\"\\s*:\\s*\"([^\"]+)\"");
                 Pattern pTitle2 = Pattern.compile("\"title\"\\s*:\\s*\\{[^}]*\"text\"\\s*:\\s*\"([^\"]+)\"");
                 Pattern pThumb = Pattern.compile("\"thumbnails\"\\s*:\\s*\\[\\s*\\{\\s*\"url\"\\s*:\\s*\"([^\"]+)\"");
-                Pattern pDesc = Pattern.compile("\"descriptionSnippet\"\\s*:\\s*\\{[^}]*\"text\"\\s*:\\s*\"([^\"]+)\"");
                 Pattern pSubs = Pattern.compile("\"subscriberCountText\"\\s*:\\s*\\{[^}]*\"simpleText\"\\s*:\\s*\"([^\"]+)\"");
 
                 while (mRenderer.find() && list.size() < 12) {
@@ -150,7 +145,6 @@ public class ChannelSearchHelper {
                     if (!mId.find()) continue;
                     String channelId = mId.group(1);
 
-                    // Check if already in results list
                     boolean duplicate = false;
                     for (ChannelSearchResult item : list) {
                         if (item.getId().equals(channelId)) {
@@ -188,11 +182,6 @@ public class ChannelSearchHelper {
                     Matcher mSubs = pSubs.matcher(block);
                     if (mSubs.find()) {
                         description = mSubs.group(1);
-                    } else {
-                        Matcher mDesc = pDesc.matcher(block);
-                        if (mDesc.find()) {
-                            description = mDesc.group(1);
-                        }
                     }
 
                     title = unescapeHtml(title);
@@ -223,8 +212,8 @@ public class ChannelSearchHelper {
                 String encoded = URLEncoder.encode(query, "UTF-8");
                 URL url = new URL(instance + "/api/v1/search?q=" + encoded + "&type=channel");
                 conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(4000);
-                conn.setReadTimeout(4000);
+                conn.setConnectTimeout(3000);
+                conn.setReadTimeout(3000);
                 conn.setRequestMethod("GET");
 
                 if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
