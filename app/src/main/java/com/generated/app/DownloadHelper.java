@@ -1,6 +1,5 @@
 package com.generated.app;
 
-import android.app.DownloadManager;
 import android.content.ContentValues;
 import android.content.Context;
 import android.media.MediaScannerConnection;
@@ -37,43 +36,9 @@ import java.util.concurrent.TimeUnit;
 public class DownloadHelper {
 
     public interface StreamCallback {
-        void onSuccess(String streamUrl, String extension, String mimeType);
+        void onSuccess(StreamResult result);
         void onError(String error);
     }
-
-    private static final ExecutorService executor = Executors.newFixedThreadPool(8);
-    private static final Handler mainHandler = new Handler(Looper.getMainLooper());
-    public static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36";
-
-    // 1. High-availability NewPipe / Piped API backends (Official NewPipe routing)
-    private static final String[] NEWPIPE_PIPED_INSTANCES = new String[]{
-            "https://pipedapi.kavin.rocks",
-            "https://api.piped.private.coffee",
-            "https://piped-api.lunar.icu",
-            "https://pa.il.ax",
-            "https://pipedapi.leptons.xyz",
-            "https://pipedapi.tokhmi.xyz"
-    };
-
-    // 2. High-availability Invidious API backends
-    private static final String[] INVIDIOUS_INSTANCES = new String[]{
-            "https://inv.nadeko.net",
-            "https://invidious.nerdvpn.de",
-            "https://yewtu.be",
-            "https://iv.melmac.space",
-            "https://invidious.jing.rocks",
-            "https://invidious.drgns.space",
-            "https://invidious.projectsegfau.lt"
-    };
-
-    // 3. Cobalt high-speed direct media engines
-    private static final String[] COBALT_INSTANCES = new String[]{
-            "https://cobalt-api.kwiatekm.tokyo",
-            "https://capi.wuk.sh",
-            "https://cobalt.api.scip.io",
-            "https://cobalt.canine.tools",
-            "https://api.cobalt.tools"
-    };
 
     public static class StreamResult {
         public String url;
@@ -87,55 +52,128 @@ public class DownloadHelper {
         }
     }
 
+    private static final ExecutorService executor = Executors.newFixedThreadPool(8);
+    private static final Handler mainHandler = new Handler(Looper.getMainLooper());
+    public static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+    // 1. High-availability Piped API backends
+    private static final String[] PIPED_INSTANCES = new String[]{
+            "https://pipedapi.kavin.rocks",
+            "https://api.piped.private.coffee",
+            "https://piped-api.lunar.icu",
+            "https://pa.il.ax",
+            "https://pipedapi.leptons.xyz"
+    };
+
+    // 2. High-availability Invidious API backends
+    private static final String[] INVIDIOUS_INSTANCES = new String[]{
+            "https://inv.nadeko.net",
+            "https://invidious.nerdvpn.de",
+            "https://yewtu.be",
+            "https://iv.melmac.space",
+            "https://invidious.jing.rocks"
+    };
+
+    // 3. Cobalt direct media engines
+    private static final String[] COBALT_INSTANCES = new String[]{
+            "https://cobalt-api.kwiatekm.tokyo",
+            "https://capi.wuk.sh",
+            "https://cobalt.api.scip.io",
+            "https://cobalt.canine.tools",
+            "https://api.cobalt.tools"
+    };
+
     public static void getStreamUrl(final String videoId, final String targetQuality, final boolean isAudioOnly, final StreamCallback callback) {
         executor.submit(new Runnable() {
             @Override
             public void run() {
-                // Step 1: Parallel probe on NewPipe / Piped API instances
-                StreamResult result = fetchFromNewPipePipedParallel(videoId, targetQuality, isAudioOnly);
-                if (result != null && isStreamUrlPlayable(result.url)) {
-                    postSuccess(callback, result.url, result.extension, result.mimeType);
+                List<StreamResult> candidates = new ArrayList<>();
+
+                // Step 1: Probe Piped API instances
+                StreamResult pipedRes = fetchFromPipedParallel(videoId, targetQuality, isAudioOnly);
+                if (pipedRes != null) candidates.add(pipedRes);
+
+                // Step 2: Probe Invidious API instances
+                StreamResult invRes = fetchFromInvidiousParallel(videoId, targetQuality, isAudioOnly);
+                if (invRes != null) candidates.add(invRes);
+
+                // Step 3: Probe Innertube Android Client Payload
+                StreamResult innerRes = fetchFromInnertubeAndroid(videoId, targetQuality, isAudioOnly);
+                if (innerRes != null) candidates.add(innerRes);
+
+                // Step 4: Probe Cobalt engines
+                StreamResult cobaltRes = fetchFromCobalt(videoId, targetQuality, isAudioOnly);
+                if (cobaltRes != null) candidates.add(cobaltRes);
+
+                // Validate each candidate to guarantee standard non-corrupt media headers
+                for (StreamResult res : candidates) {
+                    if (res != null && res.url != null && validateMediaStream(res.url)) {
+                        postSuccess(callback, res);
+                        return;
+                    }
+                }
+
+                // Step 5: Direct ITAG route fallback
+                StreamResult itagRes = fetchInvidiousItagRoute(videoId, targetQuality, isAudioOnly);
+                if (itagRes != null && validateMediaStream(itagRes.url)) {
+                    postSuccess(callback, itagRes);
                     return;
                 }
 
-                // Step 2: Parallel probe on Invidious instances (Direct media & latest_version proxy streams)
-                result = fetchFromInvidiousParallel(videoId, targetQuality, isAudioOnly);
-                if (result != null && isStreamUrlPlayable(result.url)) {
-                    postSuccess(callback, result.url, result.extension, result.mimeType);
-                    return;
-                }
-
-                // Step 3: Fast Innertube Android Client (Native YouTube Android app client payload)
-                result = fetchFromInnertubeAndroid(videoId, targetQuality, isAudioOnly);
-                if (result != null && isStreamUrlPlayable(result.url)) {
-                    postSuccess(callback, result.url, result.extension, result.mimeType);
-                    return;
-                }
-
-                // Step 4: Cobalt high-speed API
-                result = fetchFromCobalt(videoId, targetQuality, isAudioOnly);
-                if (result != null && isStreamUrlPlayable(result.url)) {
-                    postSuccess(callback, result.url, result.extension, result.mimeType);
-                    return;
-                }
-
-                // Step 5: Invidious Direct ITAG Stream Route (Guaranteed fallback for YouTube videos)
-                result = fetchInvidiousItagRoute(videoId, targetQuality, isAudioOnly);
-                if (result != null) {
-                    postSuccess(callback, result.url, result.extension, result.mimeType);
-                    return;
-                }
-
-                postError(callback, "לא הצלחנו לחלץ קישור הורדה ישיר לסרטון זה. אנא נסה שוב בעוד רגע.");
+                postError(callback, "לא הצלחנו לחלץ קישור הורדה תקין. אנא בדוק את החיבור לרשת ונסה שוב.");
             }
         });
     }
 
-    private static StreamResult fetchFromNewPipePipedParallel(final String videoId, final String targetQuality, final boolean isAudioOnly) {
-        ExecutorService pool = Executors.newFixedThreadPool(NEWPIPE_PIPED_INSTANCES.length);
+    public static boolean validateMediaStream(String streamUrl) {
+        if (streamUrl == null || !streamUrl.startsWith("http")) return false;
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(streamUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("User-Agent", USER_AGENT);
+            conn.setRequestProperty("Referer", "https://www.youtube.com/");
+            conn.setRequestProperty("Range", "bytes=0-2048");
+            conn.setConnectTimeout(4000);
+            conn.setReadTimeout(4000);
+            conn.setInstanceFollowRedirects(true);
+
+            int code = conn.getResponseCode();
+            if (code == 200 || code == 206) {
+                String contentType = conn.getContentType();
+                if (contentType != null) {
+                    String ctLower = contentType.toLowerCase();
+                    if (ctLower.contains("text/html") || ctLower.contains("application/json") || ctLower.contains("text/plain")) {
+                        return false;
+                    }
+                }
+
+                InputStream is = conn.getInputStream();
+                byte[] header = new byte[512];
+                int read = is.read(header, 0, header.length);
+                is.close();
+
+                if (read > 10) {
+                    String headStr = new String(header, 0, Math.min(read, 100)).toLowerCase();
+                    if (headStr.contains("<!doc") || headStr.contains("<html") || headStr.contains("{\"error")) {
+                        return false;
+                    }
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+        return false;
+    }
+
+    private static StreamResult fetchFromPipedParallel(final String videoId, final String targetQuality, final boolean isAudioOnly) {
+        ExecutorService pool = Executors.newFixedThreadPool(PIPED_INSTANCES.length);
         CompletionService<StreamResult> cs = new ExecutorCompletionService<>(pool);
 
-        for (final String instance : NEWPIPE_PIPED_INSTANCES) {
+        for (final String instance : PIPED_INSTANCES) {
             cs.submit(new Callable<StreamResult>() {
                 @Override
                 public StreamResult call() {
@@ -145,9 +183,9 @@ public class DownloadHelper {
         }
 
         StreamResult bestResult = null;
-        for (int i = 0; i < NEWPIPE_PIPED_INSTANCES.length; i++) {
+        for (int i = 0; i < PIPED_INSTANCES.length; i++) {
             try {
-                Future<StreamResult> future = cs.poll(4000, TimeUnit.MILLISECONDS);
+                Future<StreamResult> future = cs.poll(3500, TimeUnit.MILLISECONDS);
                 if (future != null) {
                     StreamResult r = future.get();
                     if (r != null && r.url != null && !r.url.isEmpty()) {
@@ -166,8 +204,8 @@ public class DownloadHelper {
         try {
             URL url = new URL(instance + "/streams/" + videoId);
             conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(3500);
-            conn.setReadTimeout(3500);
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3000);
             conn.setRequestMethod("GET");
             conn.setRequestProperty("User-Agent", USER_AGENT);
 
@@ -196,7 +234,6 @@ public class DownloadHelper {
                 } else {
                     JSONArray videoStreams = json.optJSONArray("videoStreams");
                     if (videoStreams != null && videoStreams.length() > 0) {
-                        // First pass: try to match quality
                         for (int i = 0; i < videoStreams.length(); i++) {
                             JSONObject stream = videoStreams.getJSONObject(i);
                             if (!stream.optBoolean("videoOnly", false)) {
@@ -208,7 +245,6 @@ public class DownloadHelper {
                                 }
                             }
                         }
-                        // Second pass: any valid muxed stream
                         for (int i = 0; i < videoStreams.length(); i++) {
                             JSONObject stream = videoStreams.getJSONObject(i);
                             if (!stream.optBoolean("videoOnly", false)) {
@@ -245,7 +281,7 @@ public class DownloadHelper {
         StreamResult bestResult = null;
         for (int i = 0; i < INVIDIOUS_INSTANCES.length; i++) {
             try {
-                Future<StreamResult> future = cs.poll(4000, TimeUnit.MILLISECONDS);
+                Future<StreamResult> future = cs.poll(3500, TimeUnit.MILLISECONDS);
                 if (future != null) {
                     StreamResult r = future.get();
                     if (r != null && r.url != null && !r.url.isEmpty()) {
@@ -264,8 +300,8 @@ public class DownloadHelper {
         try {
             URL url = new URL(instance + "/api/v1/videos/" + videoId);
             conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(3500);
-            conn.setReadTimeout(3500);
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3000);
             conn.setRequestMethod("GET");
             conn.setRequestProperty("User-Agent", USER_AGENT);
 
@@ -326,8 +362,8 @@ public class DownloadHelper {
             URL url = new URL("https://www.youtube.com/youtubei/v1/player?prettyPrint=false");
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
-            conn.setConnectTimeout(4500);
-            conn.setReadTimeout(4500);
+            conn.setConnectTimeout(4000);
+            conn.setReadTimeout(4000);
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("User-Agent", "com.google.android.youtube/19.08.35 (Linux; U; Android 14; en_US) gzip");
@@ -409,8 +445,8 @@ public class DownloadHelper {
                 URL url = new URL(cobaltBase + "/");
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
-                conn.setConnectTimeout(4500);
-                conn.setReadTimeout(5000);
+                conn.setConnectTimeout(4000);
+                conn.setReadTimeout(4000);
                 conn.setDoOutput(true);
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setRequestProperty("Accept", "application/json");
@@ -445,12 +481,6 @@ public class DownloadHelper {
                     JSONObject res = new JSONObject(sb.toString());
                     String stream = res.optString("url", "");
                     if (stream.isEmpty()) stream = res.optString("redirect", "");
-                    if (stream.isEmpty() && res.has("picker")) {
-                        JSONArray picker = res.optJSONArray("picker");
-                        if (picker != null && picker.length() > 0) {
-                            stream = picker.getJSONObject(0).optString("url", "");
-                        }
-                    }
 
                     if (!stream.isEmpty()) {
                         String ext = isAudioOnly ? "mp3" : "mp4";
@@ -472,7 +502,7 @@ public class DownloadHelper {
         String mime = "video/mp4";
 
         if (isAudioOnly) {
-            itag = 140; // m4a 128k
+            itag = 140; // m4a
             ext = "m4a";
             mime = "audio/mp4";
         } else if (targetQuality != null && targetQuality.contains("720")) {
@@ -481,40 +511,9 @@ public class DownloadHelper {
 
         for (String instance : INVIDIOUS_INSTANCES) {
             String candidate = instance + "/latest_version?id=" + videoId + "&itag=" + itag;
-            if (isStreamUrlPlayable(candidate)) {
-                return new StreamResult(candidate, ext, mime);
-            }
+            return new StreamResult(candidate, ext, mime);
         }
         return null;
-    }
-
-    private static boolean isStreamUrlPlayable(String testUrl) {
-        if (testUrl == null || !testUrl.startsWith("http")) return false;
-        HttpURLConnection conn = null;
-        try {
-            URL url = new URL(testUrl);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("User-Agent", USER_AGENT);
-            conn.setRequestProperty("Range", "bytes=0-1024");
-            conn.setConnectTimeout(3000);
-            conn.setReadTimeout(3000);
-            conn.setInstanceFollowRedirects(true);
-
-            int code = conn.getResponseCode();
-            if (code >= 200 && code < 400) {
-                String cType = conn.getContentType();
-                if (cType != null && (cType.contains("text/html") || cType.contains("application/json"))) {
-                    return false;
-                }
-                return true;
-            }
-        } catch (Exception ignored) {
-            return false;
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
-        return false;
     }
 
     public static void startDownload(final Context context, final String title, final String downloadUrl, final String extension, final String mimeType, final boolean isAudio) {
@@ -522,55 +521,16 @@ public class DownloadHelper {
         String customTreeUriStr = isAudio ? dm.getAudioTreeUri() : dm.getVideoTreeUri();
         String folderSetting = isAudio ? dm.getAudioDownloadFolder() : dm.getVideoDownloadFolder();
 
-        // 1. If user selected a custom device directory via SAF
         if (DataManager.FOLDER_CUSTOM_TREE.equals(folderSetting) && customTreeUriStr != null && !customTreeUriStr.isEmpty()) {
             downloadToDocumentTree(context, title, downloadUrl, extension, mimeType, customTreeUriStr, isAudio);
-            return;
+        } else {
+            downloadDirectlyInApp(context, title, downloadUrl, extension, mimeType, isAudio);
         }
-
-        // 2. Standard direct DownloadManager enqueue
-        try {
-            DownloadManager downloadManager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
-            if (downloadManager != null && downloadUrl.startsWith("http")) {
-                String cleanTitle = sanitizeFilename(title);
-                String fileName = cleanTitle + "_" + System.currentTimeMillis() + "." + extension;
-
-                DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadUrl));
-                request.setTitle(cleanTitle);
-                request.setDescription(isAudio ? "שיר שמע מיוטיוב בטוח" : "סרטון וידאו מיוטיוב בטוח");
-                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-                request.addRequestHeader("User-Agent", USER_AGENT);
-                request.addRequestHeader("Referer", "https://www.youtube.com/");
-                if (mimeType != null && !mimeType.isEmpty()) {
-                    request.setMimeType(mimeType);
-                }
-
-                String destinationDir = Environment.DIRECTORY_DOWNLOADS;
-                if (isAudio && DataManager.FOLDER_DEFAULT_MUSIC.equalsIgnoreCase(folderSetting)) {
-                    destinationDir = Environment.DIRECTORY_MUSIC;
-                } else if (!isAudio && DataManager.FOLDER_DEFAULT_MOVIES.equalsIgnoreCase(folderSetting)) {
-                    destinationDir = Environment.DIRECTORY_MOVIES;
-                }
-
-                try {
-                    request.setDestinationInExternalPublicDir(destinationDir, fileName);
-                } catch (Exception e) {
-                    request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
-                }
-
-                downloadManager.enqueue(request);
-                Toast.makeText(context, "ההורדה החלה ישירות ברקע! תוכל לראות את ההתקדמות בווילון ההתראות.", Toast.LENGTH_LONG).show();
-                return;
-            }
-        } catch (Exception ignored) {}
-
-        // 3. Fallback direct stream saver via MediaStore
-        downloadDirectlyWithMediaStore(context, title, downloadUrl, extension, mimeType, isAudio, folderSetting);
     }
 
     private static void downloadToDocumentTree(final Context context, final String title, final String downloadUrl, final String extension, final String mimeType, final String treeUriStr, final boolean isAudio) {
         final String displayName = (isAudio ? dmAudioName(context) : dmVideoName(context));
-        Toast.makeText(context, "מתחיל הורדה לתיקייה שבחרת: " + displayName, Toast.LENGTH_SHORT).show();
+        Toast.makeText(context, "מוריד בתוך האפליקציה לתיקייה: " + displayName, Toast.LENGTH_SHORT).show();
 
         executor.submit(new Runnable() {
             @Override
@@ -598,36 +558,13 @@ public class DownloadHelper {
                         throw new Exception("שגיאה בפתיחת ערוץ כתיבה לקובץ");
                     }
 
-                    URL url = new URL(downloadUrl);
-                    conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestProperty("User-Agent", USER_AGENT);
-                    conn.setRequestProperty("Accept", "*/*");
-                    conn.setConnectTimeout(15000);
-                    conn.setReadTimeout(30000);
-                    conn.setInstanceFollowRedirects(true);
-
-                    int responseCode = conn.getResponseCode();
-                    int redirectCount = 0;
-                    while ((responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == HttpURLConnection.HTTP_MOVED_PERM || responseCode == 301 || responseCode == 302 || responseCode == 303 || responseCode == 307 || responseCode == 308) && redirectCount < 8) {
-                        String newUrl = conn.getHeaderField("Location");
-                        if (newUrl == null || newUrl.isEmpty()) break;
-                        conn.disconnect();
-                        url = new URL(newUrl);
-                        conn = (HttpURLConnection) url.openConnection();
-                        conn.setRequestProperty("User-Agent", USER_AGENT);
-                        conn.setRequestProperty("Accept", "*/*");
-                        conn.setConnectTimeout(15000);
-                        conn.setReadTimeout(30000);
-                        responseCode = conn.getResponseCode();
-                        redirectCount++;
-                    }
-
-                    if (responseCode != HttpURLConnection.HTTP_OK && responseCode != HttpURLConnection.HTTP_PARTIAL) {
-                        throw new Exception("תגובת שרת לא תקינה (" + responseCode + ")");
+                    conn = createValidMediaConnection(downloadUrl);
+                    if (conn == null) {
+                        throw new Exception("קישור ההורדה לא הגיב כראוי");
                     }
 
                     in = conn.getInputStream();
-                    byte[] buffer = new byte[16384];
+                    byte[] buffer = new byte[32768];
                     int bytesRead;
                     while ((bytesRead = in.read(buffer)) != -1) {
                         out.write(buffer, 0, bytesRead);
@@ -635,10 +572,14 @@ public class DownloadHelper {
                     }
                     out.flush();
 
+                    if (totalBytes < 50000) {
+                        throw new Exception("קובץ ההורדה קטן מדי או פגום");
+                    }
+
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            Toast.makeText(context, "ההורדה הושלמה בהצלחה לתיקייה: " + displayName, Toast.LENGTH_LONG).show();
+                            Toast.makeText(context, "ההורדה הושלמה בהצלחה! הקובץ תקין ומוכן להפעלה.", Toast.LENGTH_LONG).show();
                         }
                     });
 
@@ -650,8 +591,8 @@ public class DownloadHelper {
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            Toast.makeText(context, "שומר להורדות המכשיר הראשיות...", Toast.LENGTH_SHORT).show();
-                            downloadDirectlyWithMediaStore(context, title, downloadUrl, extension, mimeType, isAudio, DataManager.FOLDER_DEFAULT_DOWNLOADS);
+                            Toast.makeText(context, "שומר לתיקיית ההורדות הראשית של המכשיר...", Toast.LENGTH_SHORT).show();
+                            downloadDirectlyInApp(context, title, downloadUrl, extension, mimeType, isAudio);
                         }
                     });
                 } finally {
@@ -663,8 +604,8 @@ public class DownloadHelper {
         });
     }
 
-    private static void downloadDirectlyWithMediaStore(final Context context, final String title, final String downloadUrl, final String extension, final String mimeType, final boolean isAudio, final String targetFolderKey) {
-        Toast.makeText(context, "מתחיל בהורדה ישירה למכשיר...", Toast.LENGTH_SHORT).show();
+    private static void downloadDirectlyInApp(final Context context, final String title, final String downloadUrl, final String extension, final String mimeType, final boolean isAudio) {
+        Toast.makeText(context, "מתחיל בהורדה פנימית בתוך האפליקציה...", Toast.LENGTH_SHORT).show();
 
         executor.submit(new Runnable() {
             @Override
@@ -683,7 +624,7 @@ public class DownloadHelper {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         ContentValues values = new ContentValues();
                         values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
-                        values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType != null ? mimeType : (isAudio ? "audio/mpeg" : "video/mp4"));
+                        values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType != null ? mimeType : (isAudio ? "audio/mp4" : "video/mp4"));
                         values.put(MediaStore.MediaColumns.IS_PENDING, 1);
 
                         if (isAudio) {
@@ -714,45 +655,26 @@ public class DownloadHelper {
                     }
 
                     if (out == null) {
-                        throw new Exception("שגיאה בפתיחת קובץ יעד");
+                        throw new Exception("שגיאה בפתיחת קובץ יעד בזיכרון המכשיר");
                     }
 
-                    URL url = new URL(downloadUrl);
-                    conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestProperty("User-Agent", USER_AGENT);
-                    conn.setRequestProperty("Accept", "*/*");
-                    conn.setConnectTimeout(15000);
-                    conn.setReadTimeout(30000);
-                    conn.setInstanceFollowRedirects(true);
-
-                    int responseCode = conn.getResponseCode();
-                    int redirectCount = 0;
-                    while ((responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == HttpURLConnection.HTTP_MOVED_PERM || responseCode == 301 || responseCode == 302 || responseCode == 303 || responseCode == 307 || responseCode == 308) && redirectCount < 8) {
-                        String newUrl = conn.getHeaderField("Location");
-                        if (newUrl == null || newUrl.isEmpty()) break;
-                        conn.disconnect();
-                        url = new URL(newUrl);
-                        conn = (HttpURLConnection) url.openConnection();
-                        conn.setRequestProperty("User-Agent", USER_AGENT);
-                        conn.setRequestProperty("Accept", "*/*");
-                        conn.setConnectTimeout(15000);
-                        conn.setReadTimeout(30000);
-                        responseCode = conn.getResponseCode();
-                        redirectCount++;
-                    }
-
-                    if (responseCode != HttpURLConnection.HTTP_OK && responseCode != HttpURLConnection.HTTP_PARTIAL) {
-                        throw new Exception("שגיאת שרת: " + responseCode);
+                    conn = createValidMediaConnection(downloadUrl);
+                    if (conn == null) {
+                        throw new Exception("תגובת שרת לא תקינה");
                     }
 
                     in = conn.getInputStream();
-                    byte[] buffer = new byte[16384];
+                    byte[] buffer = new byte[32768];
                     int bytesRead;
                     while ((bytesRead = in.read(buffer)) != -1) {
                         out.write(buffer, 0, bytesRead);
                         totalBytes += bytesRead;
                     }
                     out.flush();
+
+                    if (totalBytes < 50000) {
+                        throw new Exception("הקובץ שהתקבל קטן מדי או פגום");
+                    }
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && itemUri != null) {
                         ContentValues updateVals = new ContentValues();
@@ -765,7 +687,7 @@ public class DownloadHelper {
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            Toast.makeText(context, "הקובץ ירד בהצלחה ונשמר במכשיר!", Toast.LENGTH_LONG).show();
+                            Toast.makeText(context, "ההורדה הושלמה בהצלחה! הקובץ נשמר במכשיר ומוכן לנגינה.", Toast.LENGTH_LONG).show();
                         }
                     });
 
@@ -792,6 +714,48 @@ public class DownloadHelper {
         });
     }
 
+    private static HttpURLConnection createValidMediaConnection(String initialUrl) throws Exception {
+        URL url = new URL(initialUrl);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestProperty("User-Agent", USER_AGENT);
+        conn.setRequestProperty("Accept", "*/*");
+        conn.setRequestProperty("Referer", "https://www.youtube.com/");
+        conn.setRequestProperty("Origin", "https://www.youtube.com");
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(30000);
+        conn.setInstanceFollowRedirects(true);
+
+        int code = conn.getResponseCode();
+        int redirects = 0;
+        while ((code == 301 || code == 302 || code == 303 || code == 307 || code == 308) && redirects < 8) {
+            String newUrl = conn.getHeaderField("Location");
+            if (newUrl == null || newUrl.isEmpty()) break;
+            conn.disconnect();
+            url = new URL(newUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestProperty("User-Agent", USER_AGENT);
+            conn.setRequestProperty("Accept", "*/*");
+            conn.setRequestProperty("Referer", "https://www.youtube.com/");
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(30000);
+            code = conn.getResponseCode();
+            redirects++;
+        }
+
+        if (code != 200 && code != 206) {
+            conn.disconnect();
+            return null;
+        }
+
+        String contentType = conn.getContentType();
+        if (contentType != null && (contentType.contains("text/html") || contentType.contains("application/json"))) {
+            conn.disconnect();
+            return null;
+        }
+
+        return conn;
+    }
+
     private static String sanitizeFilename(String name) {
         if (name == null || name.trim().isEmpty()) {
             return "media_" + System.currentTimeMillis();
@@ -813,11 +777,11 @@ public class DownloadHelper {
         return n != null ? n : "תיקיית סרטונים מותאמת";
     }
 
-    private static void postSuccess(final StreamCallback callback, final String url, final String ext, final String mime) {
+    private static void postSuccess(final StreamCallback callback, final StreamResult result) {
         mainHandler.post(new Runnable() {
             @Override
             public void run() {
-                callback.onSuccess(url, ext, mime);
+                callback.onSuccess(result);
             }
         });
     }

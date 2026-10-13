@@ -107,7 +107,7 @@ public class PlayerActivity extends Activity {
             ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         }
 
-        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36");
+        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36");
 
         webViewPlayer.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -268,13 +268,13 @@ public class PlayerActivity extends Activity {
 
     private void startDirectInAppDownload(final String qualityKey, final boolean isAudioOnly) {
         pbDownloadLoading.setVisibility(View.VISIBLE);
-        Toast.makeText(this, isAudioOnly ? "מחלץ שמע ישירות משרתי NewPipe..." : "מחלץ וידאו ישירות משרתי NewPipe...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, isAudioOnly ? "מחלץ קובץ שמע תקין בתוך האפליקציה..." : "מחלץ קובץ וידאו תקין בתוך האפליקציה...", Toast.LENGTH_SHORT).show();
 
         DownloadHelper.getStreamUrl(currentVideoId, qualityKey, isAudioOnly, new DownloadHelper.StreamCallback() {
             @Override
-            public void onSuccess(String streamUrl, String extension, String mimeType) {
+            public void onSuccess(DownloadHelper.StreamResult result) {
                 pbDownloadLoading.setVisibility(View.GONE);
-                DownloadHelper.startDownload(PlayerActivity.this, currentVideoTitle, streamUrl, extension, mimeType, isAudioOnly);
+                DownloadHelper.startDownload(PlayerActivity.this, currentVideoTitle, result.url, result.extension, result.mimeType, isAudioOnly);
 
                 new AlertDialog.Builder(PlayerActivity.this)
                         .setTitle(R.string.download_started_title)
@@ -315,12 +315,12 @@ public class PlayerActivity extends Activity {
 
         DownloadHelper.getStreamUrl(currentVideoId, "128k", true, new DownloadHelper.StreamCallback() {
             @Override
-            public void onSuccess(String streamUrl, String extension, String mimeType) {
+            public void onSuccess(DownloadHelper.StreamResult result) {
                 pbDownloadLoading.setVisibility(View.GONE);
 
                 Intent serviceIntent = new Intent(PlayerActivity.this, BackgroundAudioService.class);
                 serviceIntent.setAction(BackgroundAudioService.ACTION_START);
-                serviceIntent.putExtra(BackgroundAudioService.EXTRA_URL, streamUrl);
+                serviceIntent.putExtra(BackgroundAudioService.EXTRA_URL, result.url);
                 serviceIntent.putExtra(BackgroundAudioService.EXTRA_TITLE, currentVideoTitle);
                 serviceIntent.putExtra(BackgroundAudioService.EXTRA_CHANNEL, currentChannelTitle);
                 serviceIntent.putExtra(BackgroundAudioService.EXTRA_VIDEO_ID, currentVideoId);

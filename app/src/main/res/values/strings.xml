@@ -19,8 +19,8 @@
     <string name="btn_add_custom">חיפוש והוספת ערוץ חדש</string>
     <string name="btn_add_channel">הוסף ערוץ</string>
     <string name="btn_search">חפש ערוץ</string>
-    <string name="btn_download_video">הורדת סרטון ישירות</string>
-    <string name="btn_download_audio">הורדת שיר ישירות</string>
+    <string name="btn_download_video">הורדת סרטון ישירות באפליקציה</string>
+    <string name="btn_download_audio">הורדת שיר ישירות באפליקציה</string>
     <string name="btn_background_listen">האזנה ברקע (מסך כבוי)</string>
     <string name="bg_audio_loading">מכין שמע להאזנה ברקע...</string>
     <string name="bg_audio_error">לא הצלחנו להפעיל האזנה ברקע כרגע, נסה שוב בעוד מספר רגעים.</string>
@@ -44,10 +44,10 @@
     <string name="audio_quality_med">איכות שמע רגילה (MP3 / 128 kbps)</string>
     <string name="audio_quality_low">איכות שמע קלה וחסכונית (64 kbps)</string>
     <string name="download_failed_title">שגיאה בהורדת המדיה</string>
-    <string name="download_failed_message">לא הצלחנו להוריד את הקובץ ישירות כרגע. האם לנסות שוב?</string>
+    <string name="download_failed_message">לא הצלחנו לחלץ קובץ מדיה תקין כרגע. האם לנסות שוב?</string>
     <string name="btn_retry">נסה שוב</string>
-    <string name="download_started_title">ההורדה החלה ישירות למכשיר!</string>
-    <string name="download_started_message">הקובץ נשמר ישירות בתיקייה שבחרת. ניתן לעקוב אחר התקדמות ההורדה בווילון ההתראות של המכשיר.</string>
+    <string name="download_started_title">ההורדה החלה בתוך האפליקציה!</string>
+    <string name="download_started_message">הקובץ מורד ונשמר ישירות בתיקיית היעד ללא צורך בדפדפן חיצוני.</string>
     <string name="download_error">לא הצלחנו להוריד כרגע, אנא נסה שוב בעוד מספר רגעים.</string>
     <string name="incorrect_password">סיסמה שגויה!</string>
     <string name="password_prompt">הכנס סיסמת מנהל (ברירת מחדל: 1234):</string>
