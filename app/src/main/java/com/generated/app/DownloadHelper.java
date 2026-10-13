@@ -56,7 +56,7 @@ public class DownloadHelper {
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
     public static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-    // 1. High-availability Cobalt direct media engines (Guaranteed full-bandwidth uncorrupted media)
+    // High-availability Cobalt direct media engines (Guaranteed full-bandwidth uncorrupted media)
     private static final String[] COBALT_INSTANCES = new String[]{
             "https://cobalt-api.kwiatekm.tokyo",
             "https://capi.wuk.sh",
@@ -65,7 +65,7 @@ public class DownloadHelper {
             "https://api.cobalt.tools"
     };
 
-    // 2. High-availability Piped API backends
+    // High-availability Piped API backends
     private static final String[] PIPED_INSTANCES = new String[]{
             "https://pipedapi.kavin.rocks",
             "https://api.piped.private.coffee",
@@ -74,7 +74,7 @@ public class DownloadHelper {
             "https://pipedapi.leptons.xyz"
     };
 
-    // 3. High-availability Invidious API backends
+    // High-availability Invidious API backends
     private static final String[] INVIDIOUS_INSTANCES = new String[]{
             "https://inv.nadeko.net",
             "https://invidious.nerdvpn.de",
@@ -540,7 +540,12 @@ public class DownloadHelper {
 
     private static void downloadToDocumentTree(final Context context, final String title, final String downloadUrl, final String extension, final String mimeType, final String treeUriStr, final boolean isAudio) {
         final String displayName = (isAudio ? dmAudioName(context) : dmVideoName(context));
-        Toast.makeText(context, "מוריד בתוך האפליקציה לתיקייה: " + displayName, Toast.LENGTH_SHORT).show();
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(context, "מוריד פנימית ישירות לתיקייה: " + displayName, Toast.LENGTH_SHORT).show();
+            }
+        });
 
         executor.submit(new Runnable() {
             @Override
@@ -554,7 +559,7 @@ public class DownloadHelper {
                 try {
                     Uri treeUri = Uri.parse(treeUriStr);
                     String cleanTitle = sanitizeFilename(title);
-                    String filename = cleanTitle + "." + extension;
+                    String filename = cleanTitle + "_" + System.currentTimeMillis() + "." + extension;
 
                     Uri docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri));
                     createdFileUri = DocumentsContract.createDocument(context.getContentResolver(), docUri, mimeType, filename);
@@ -589,7 +594,7 @@ public class DownloadHelper {
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            Toast.makeText(context, "ההורדה הושלמה בהצלחה! הקובץ תקין ומוכן להפעלה.", Toast.LENGTH_LONG).show();
+                            Toast.makeText(context, "ההורדה הושלמה בהצלחה! הקובץ נשמר ונמצא בתיקייה שלך.", Toast.LENGTH_LONG).show();
                         }
                     });
 
@@ -615,7 +620,12 @@ public class DownloadHelper {
     }
 
     private static void downloadDirectlyInApp(final Context context, final String title, final String downloadUrl, final String extension, final String mimeType, final boolean isAudio) {
-        Toast.makeText(context, "מתחיל בהורדה פנימית בתוך האפליקציה...", Toast.LENGTH_SHORT).show();
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(context, "מוריד קובץ מדיה ישירות למכשיר...", Toast.LENGTH_SHORT).show();
+            }
+        });
 
         executor.submit(new Runnable() {
             @Override
@@ -670,7 +680,7 @@ public class DownloadHelper {
 
                     conn = createValidMediaConnection(downloadUrl);
                     if (conn == null) {
-                        throw new Exception("תגובת שרת לא תקינה");
+                        throw new Exception("תגובת שרת ההורדה לא תקינה");
                     }
 
                     in = conn.getInputStream();
